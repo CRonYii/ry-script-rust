@@ -22,6 +22,9 @@ struct Matrix {
     container: Array2<f64>,
 }
 
+/* the ndarray module itself can already perform matrix opeartion just like numpy.
+ * Implementing the matrix class is just for my own learning purpose.
+ */
 impl Matrix {
     fn new(shape: (usize, usize)) -> Matrix {
         Matrix {
@@ -63,13 +66,9 @@ impl ops::Mul<Matrix> for Matrix {
         let mut container = Array2::<f64>::zeros((n_rows, n_cols));
         for r in 0..n_rows {
             for c in 0..n_cols {
-                let row = self.container.row(r);
-                let col = other.container.column(c);
-                let mut sum = 0.0;
                 for x in 0..self.n_cols() {
-                    sum += row[[x]] * col[[x]];
+                    container[[r, c]] += self.container[[r, x]] * other.container[[x, c]];
                 }
-                container[[r, c]] = sum;
             }
         }
         Matrix::from(container)
