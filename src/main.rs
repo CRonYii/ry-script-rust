@@ -59,17 +59,17 @@ impl fmt::Display for Matrix {
         }
         for r in 0..self.n_rows() {
             if r != 0 {
-                write!(f, "\n [");
+                write!(f, "\n [")?
             } else {
-                write!(f, "[[");
+                write!(f, "[[")?
             }
             for c in 0..self.n_cols() {
                 if c != 0 {
-                    write!(f, " ");
+                    write!(f, " ")?
                 }
-                write!(f, "{:1$}", self.container[[r, c]], n_digit);
+                write!(f, "{:1$}", self.container[[r, c]], n_digit)?
             }
-            write!(f, "]");
+            write!(f, "]")?
         }
         write!(f, "]")
     }
