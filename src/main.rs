@@ -25,13 +25,6 @@ struct Matrix {
  * Implementing the matrix class is just for my own learning purpose.
  */
 impl Matrix {
-    fn new(shape: (usize, usize)) -> Matrix {
-        Matrix {
-            shape,
-            container: Array2::zeros(shape),
-        }
-    }
-
     fn from(eles: Array2<f64>) -> Matrix {
         let dim = eles.shape();
         let shape = (dim[0], dim[1]);
@@ -52,7 +45,33 @@ impl Matrix {
 
 impl fmt::Display for Matrix {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.container)
+        let mut max = 0.0;
+        for x in self.container.iter() {
+            if *x > max {
+                max = *x;
+            }
+        }
+        let mut max_int = max as i64;
+        let mut n_digit = 0;
+        while max_int != 0 {
+            n_digit += 1;
+            max_int /= 10;
+        }
+        for r in 0..self.n_rows() {
+            if r != 0 {
+                write!(f, "\n [");
+            } else {
+                write!(f, "[[");
+            }
+            for c in 0..self.n_cols() {
+                if c != 0 {
+                    write!(f, " ");
+                }
+                write!(f, "{:1$}", self.container[[r, c]], n_digit);
+            }
+            write!(f, "]");
+        }
+        write!(f, "]")
     }
 }
 
