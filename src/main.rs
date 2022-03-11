@@ -1,9 +1,16 @@
 use ndarray::prelude::*;
 use std::fmt::Debug;
 
+#[macro_export]
+macro_rules! matrix {
+    ($([$($x:expr),* $(,)*]),+ $(,)*) => {{
+        $crate::Matrix::from(array![$([$($x,)*],)*])
+    }};
+}
+
 fn main() {
-    let m1 = Matrix::from(array![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
-    let m2 = Matrix::from(array![[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]);
+    let m1 = matrix![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]];
+    let m2 = matrix![[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]];
     let m3 = match m1.mul(&m2) {
         Ok(m) => m,
         Err(e) => panic!("MatrixError: {}", e),
