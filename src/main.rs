@@ -1,5 +1,5 @@
 use ndarray::prelude::*;
-use std::fmt::Debug;
+use std::fmt;
 use std::ops;
 
 #[macro_export]
@@ -13,10 +13,9 @@ fn main() {
     let m1 = matrix![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]];
     let m2 = matrix![[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]];
     let m3 = m1 * m2;
-    println!("m3 = {:#?}", &m3);
+    println!("m3:\n{}", &m3);
 }
 
-#[derive(Debug)]
 struct Matrix {
     shape: (usize, usize),
     container: Array2<f64>,
@@ -48,6 +47,12 @@ impl Matrix {
 
     fn n_cols(&self) -> usize {
         self.shape.1
+    }
+}
+
+impl fmt::Display for Matrix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.container)
     }
 }
 
