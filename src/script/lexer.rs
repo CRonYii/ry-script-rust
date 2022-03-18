@@ -1,4 +1,4 @@
-use super::token::Token;
+use super::token::{TokenType, Token};
 
 #[derive(PartialEq, Eq)]
 struct LexerHandler {
@@ -8,7 +8,7 @@ struct LexerHandler {
 
 struct LexerResult {
     state: LexerHandler,
-    create: Option<fn(buffer: &String) -> Token>, // Token type
+    create: Option<TokenType>, // Token type
     buffer: bool,
     move_cursor: bool,
     error: Option<String>,
@@ -78,7 +78,7 @@ impl Lexer {
             },
             '\0' => LexerResult {
                 state: Lexer::END_STATE,
-                create: Some(Token::end),
+                create: Some(TokenType::End),
                 buffer: false,
                 move_cursor: false,
                 error: None,
@@ -102,7 +102,7 @@ impl Lexer {
             },
             _ => LexerResult {
                 state: Lexer::NORMAL_STATE,
-                create: Some(Token::identifier),
+                create: Some(TokenType::Identifier),
                 buffer: false,
                 move_cursor: false,
                 error: None,
@@ -123,7 +123,7 @@ impl Lexer {
             },
             _ => LexerResult {
                 state: Lexer::NORMAL_STATE,
-                create: Some(Token::sign),
+                create: Some(TokenType::Sign),
                 buffer: false,
                 move_cursor: false,
                 error: None,
@@ -150,7 +150,7 @@ impl Lexer {
             },
             _ => LexerResult {
                 state: Lexer::NORMAL_STATE,
-                create: Some(Token::number),
+                create: Some(TokenType::Number),
                 buffer: false,
                 move_cursor: false,
                 error: None,
@@ -170,7 +170,7 @@ impl Lexer {
             },
             _ => LexerResult {
                 state: Lexer::NORMAL_STATE,
-                create: Some(Token::number),
+                create: Some(TokenType::Number),
                 buffer: false,
                 move_cursor: false,
                 error: None,
@@ -187,7 +187,7 @@ impl Lexer {
             },
             '"' => LexerResult { // TODO implement escape character \"
                 state: Lexer::NORMAL_STATE,
-                create: Some(Token::string),
+                create: Some(TokenType::String),
                 buffer: false,
                 move_cursor: true,
                 error: None,
@@ -250,7 +250,7 @@ impl Lexer {
         }
         match res.create {
             Some(token) => {
-                self.tokens.push(token(&self.buffer));
+                self.tokens.push(token.entity(&self.buffer));
                 self.buffer.clear();
             }
             None => (),
