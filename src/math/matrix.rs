@@ -2,6 +2,7 @@ use ndarray::prelude::*;
 use std::fmt;
 use std::ops;
 
+#[derive(Debug, PartialEq)]
 pub struct Matrix {
     shape: (usize, usize),
     container: Array2<f64>,
