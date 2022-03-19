@@ -5,27 +5,38 @@ use std::vec::Vec;
 #[derive(Debug, Clone, Copy)]
 pub enum TokenType {
     Identifier,
-    Sign,
     Number,
     String,
-    PlusSign,
-    MinusSign,
-    MultiplySign,
-    DivideSign,
-    ModulusSign,
-    NotSign,
-    AssignmentSign,
-    EqualSign,
-    InequalSign,
-    GreaterThanSign,
-    LessThanSign,
-    GreaterThanEqualSign,
-    LessThanEqualSign,
+    If,
+    Else,
+    While,
+    Break,
+    Continue,
+    Function,
+    Return,
+    True,
+    False,
+    None,
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Modulus,
+    Not,
+    Assignment,
+    Equal,
+    Inequal,
+    GreaterThan,
+    LessThan,
+    GreaterThanEqual,
+    LessThanEqual,
     Dot,
     Comma,
     SemiColon,
     LeftParenthese,
     RightParenthese,
+    LeftCurlyBracket,
+    RightCurlyBracket,
     EOF,
 }
 
@@ -44,52 +55,79 @@ impl TokenType {
     }
 }
 
-pub struct TokenSign {
-    signs_map: HashMap<&'static str, TokenType>,
+pub struct TokenMap {
+    operator_map: HashMap<&'static str, TokenType>,
+    keyword_map: HashMap<&'static str, TokenType>,
     signs_chars_set: HashSet<char>,
 }
 
-impl TokenSign {
-    pub fn init() ->TokenSign {
-        let mut set = TokenSign {
-            signs_map: HashMap::new(),
+impl TokenMap {
+    pub fn init() -> TokenMap {
+        let mut set = TokenMap {
+            operator_map: HashMap::new(),
+            keyword_map: HashMap::new(),
             signs_chars_set: HashSet::new()
         };
-        set.signs_map.insert("+", TokenType::PlusSign);
-        set.signs_map.insert("-", TokenType::MinusSign);
-        set.signs_map.insert("*", TokenType::MultiplySign);
-        set.signs_map.insert("/", TokenType::DivideSign);
-        set.signs_map.insert("%", TokenType::ModulusSign);
-        set.signs_map.insert("!", TokenType::NotSign);
-        set.signs_map.insert("=", TokenType::AssignmentSign);
-        set.signs_map.insert("==", TokenType::EqualSign);
-        set.signs_map.insert("!=", TokenType::InequalSign);
-        set.signs_map.insert(">", TokenType::GreaterThanSign);
-        set.signs_map.insert("<", TokenType::LessThanSign);
-        set.signs_map.insert("<=", TokenType::GreaterThanEqualSign);
-        set.signs_map.insert("<=", TokenType::LessThanEqualSign);
-        set.signs_map.insert(".", TokenType::Dot);
-        set.signs_map.insert(",", TokenType::Comma);
-        set.signs_map.insert(";", TokenType::SemiColon);
-        set.signs_map.insert("(", TokenType::LeftParenthese);
-        set.signs_map.insert(")", TokenType::RightParenthese);
-        for (sign, _) in &set.signs_map {
+        // operators
+        set.operator_map.insert("+", TokenType::Plus);
+        set.operator_map.insert("-", TokenType::Minus);
+        set.operator_map.insert("*", TokenType::Multiply);
+        set.operator_map.insert("/", TokenType::Divide);
+        set.operator_map.insert("%", TokenType::Modulus);
+        set.operator_map.insert("!", TokenType::Not);
+        set.operator_map.insert("=", TokenType::Assignment);
+        set.operator_map.insert("==", TokenType::Equal);
+        set.operator_map.insert("!=", TokenType::Inequal);
+        set.operator_map.insert(">", TokenType::GreaterThan);
+        set.operator_map.insert("<", TokenType::LessThan);
+        set.operator_map.insert("<=", TokenType::GreaterThanEqual);
+        set.operator_map.insert("<=", TokenType::LessThanEqual);
+        set.operator_map.insert(".", TokenType::Dot);
+        set.operator_map.insert(",", TokenType::Comma);
+        set.operator_map.insert(";", TokenType::SemiColon);
+        set.operator_map.insert("(", TokenType::LeftParenthese);
+        set.operator_map.insert(")", TokenType::RightParenthese);
+        set.operator_map.insert("{", TokenType::LeftCurlyBracket);
+        set.operator_map.insert("}", TokenType::RightCurlyBracket);
+        for (sign, _) in &set.operator_map {
             for ch in sign.chars() {
                 set.signs_chars_set.insert(ch);
             }
         }
+        // keyword
+        set.keyword_map.insert("if", TokenType::If);
+        set.keyword_map.insert("else", TokenType::Else);
+        set.keyword_map.insert("while", TokenType::While);
+        set.keyword_map.insert("break", TokenType::Break);
+        set.keyword_map.insert("continue", TokenType::Continue);
+        set.keyword_map.insert("fn", TokenType::Function);
+        set.keyword_map.insert("return", TokenType::Return);
+        set.keyword_map.insert("true", TokenType::True);
+        set.keyword_map.insert("false", TokenType::False);
+        set.keyword_map.insert("null", TokenType::None);
         set
     }
 
     pub fn get_sign_type(&self, sign: &str) -> Option<TokenType> {
-        match self.signs_map.get(sign) {
+        match self.operator_map.get(sign) {
             Some(token) => Some(*token),
             None => None
         }
     }
 
+    pub fn get_keyword_type(&self, sign: &str) -> Option<TokenType> {
+        match self.keyword_map.get(sign) {
+            Some(token) => Some(*token),
+            None => None
+        }
+    }
+
+    pub fn is_keyword(&self, sign: &str) -> bool {
+        self.keyword_map.contains_key(sign)
+    }
+
     pub fn is_valid_sign(&self, sign: &str) -> bool {
-        self.signs_map.contains_key(sign)
+        self.operator_map.contains_key(sign)
     }
 
     pub fn is_valid_sign_character(&self, ch: char) -> bool {
@@ -103,15 +141,17 @@ impl Display for Tokens {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for token in &self.0 {
             write!(f, "{} ", token.value)?;
-            if token.value == ";" {
-                writeln!(f)?
+            match token.r#type {
+                TokenType::SemiColon | TokenType::LeftCurlyBracket | TokenType::RightCurlyBracket => writeln!(f)?,
+                _ => ()
             }
         }
         writeln!(f)?;
         for token in &self.0 {
             write!(f, "{:?} ", token.r#type)?;
-            if token.value == ";" {
-                writeln!(f)?
+            match token.r#type {
+                TokenType::SemiColon | TokenType::LeftCurlyBracket | TokenType::RightCurlyBracket => writeln!(f)?,
+                _ => ()
             }
         }
         Ok(())

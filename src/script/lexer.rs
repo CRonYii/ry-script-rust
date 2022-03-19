@@ -1,4 +1,4 @@
-use super::token::{TokenType, Token, TokenSign, Tokens};
+use super::token::{TokenType, Token, TokenMap, Tokens};
 use std::mem::take;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -26,7 +26,7 @@ pub struct Lexer {
     state: LexerState,
     buffer: String,
     tokens: Vec<Token>,
-    signs: TokenSign,
+    signs: TokenMap,
     error: String,
 }
 
@@ -104,6 +104,13 @@ impl Lexer {
                 create: None,
                 buffer: true,
                 move_cursor: true,
+                error: None,
+            },
+            _ if self.signs.is_keyword(&self.buffer) => LexerResult {
+                state: LexerState::Normal,
+                create: self.signs.get_keyword_type(&self.buffer),
+                buffer: false,
+                move_cursor: false,
                 error: None,
             },
             _ => LexerResult {
@@ -232,7 +239,7 @@ impl Lexer {
             state: LexerState::Normal,
             buffer: String::new(),
             tokens: Vec::new(),
-            signs: TokenSign::init(),
+            signs: TokenMap::init(),
             error: "No error".to_owned(),
         }
     }
