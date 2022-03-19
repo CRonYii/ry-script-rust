@@ -24,8 +24,8 @@ fn main() {
         }
         match lexer.parse(&line) {
             Ok(tokens) => {
-                dbg!(tokens);
-                ()
+                #[cfg(debug_assertions)]
+                println!("{}", tokens)
             }
             Err(err) => eprintln!("{}", err),
         }

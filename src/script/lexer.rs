@@ -1,4 +1,4 @@
-use super::token::{TokenType, Token, TokenSign};
+use super::token::{TokenType, Token, TokenSign, Tokens};
 use std::mem::take;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -85,7 +85,7 @@ impl Lexer {
             },
             '\0' => LexerResult {
                 state: LexerState::End,
-                create: Some(TokenType::End),
+                create: Some(TokenType::EOF),
                 buffer: false,
                 move_cursor: false,
                 error: None,
@@ -243,7 +243,7 @@ impl Lexer {
         self.tokens.clear();
     }
 
-    pub fn parse(&mut self, input: &str) -> Result<Vec<Token>, String> {
+    pub fn parse(&mut self, input: &str) -> Result<Tokens, String> {
         self.reset();
         let mut iter = input.chars();
         let mut move_cursor = false;
@@ -262,14 +262,15 @@ impl Lexer {
         }
         match self.state {
             LexerState::End => {
-                Ok(take(&mut self.tokens))
+                Ok(Tokens(take(&mut self.tokens)))
             },
             _ => Err(take(&mut self.error)),
         }
     }
 
     fn parse_char(&mut self, ch: char) -> bool {
-        dbg!(&self.state, ch);
+        #[cfg(debug_assertions)]
+        println!("{:?} -> {:?}", self.state, ch);
         let res = match self.state {
             LexerState::Normal => self.handle_normal_state(ch),
             LexerState::Identifier => self.handle_identifier_state(ch),

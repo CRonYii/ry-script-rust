@@ -1,4 +1,5 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::Display};
+use std::vec::Vec;
 
 #[derive(Debug)]
 pub enum TokenType {
@@ -6,13 +7,13 @@ pub enum TokenType {
     Sign,
     Number,
     String,
-    End,
+    EOF,
 }
 
 #[derive(Debug)]
 pub struct Token {
-    r#type: TokenType,
-    value: String,
+    pub r#type: TokenType,
+    pub value: String,
 }
 
 impl TokenType {
@@ -49,5 +50,26 @@ impl TokenSign {
 
     pub fn is_valid_sign_character(&self, ch: char) -> bool {
         self.signs_chars_set.contains(&ch)
+    }
+}
+
+pub struct Tokens(pub Vec<Token>);
+
+impl Display for Tokens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for token in &self.0 {
+            write!(f, "{} ", token.value)?;
+            if token.value == ";" {
+                writeln!(f)?
+            }
+        }
+        writeln!(f)?;
+        for token in &self.0 {
+            write!(f, "{:?} ", token.r#type)?;
+            if token.value == ";" {
+                writeln!(f)?
+            }
+        }
+        Ok(())
     }
 }
