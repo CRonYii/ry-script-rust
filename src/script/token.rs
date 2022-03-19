@@ -1,12 +1,31 @@
-use std::{collections::HashSet, fmt::Display};
+use std::collections::{HashSet, HashMap};
+use std::fmt::Display;
 use std::vec::Vec;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum TokenType {
     Identifier,
     Sign,
     Number,
     String,
+    PlusSign,
+    MinusSign,
+    MultiplySign,
+    DivideSign,
+    ModulusSign,
+    NotSign,
+    AssignmentSign,
+    EqualSign,
+    InequalSign,
+    GreaterThanSign,
+    LessThanSign,
+    GreaterThanEqualSign,
+    LessThanEqualSign,
+    Dot,
+    Comma,
+    SemiColon,
+    LeftParenthese,
+    RightParenthese,
     EOF,
 }
 
@@ -26,17 +45,35 @@ impl TokenType {
 }
 
 pub struct TokenSign {
-    signs_set: HashSet<&'static str>,
+    signs_map: HashMap<&'static str, TokenType>,
     signs_chars_set: HashSet<char>,
 }
 
 impl TokenSign {
     pub fn init() ->TokenSign {
         let mut set = TokenSign {
-            signs_set: HashSet::from(["+","-","*","/","%","!","=","==","!=",">","<",">=","<=",";",".","(",")"]),
+            signs_map: HashMap::new(),
             signs_chars_set: HashSet::new()
         };
-        for sign in &set.signs_set {
+        set.signs_map.insert("+", TokenType::PlusSign);
+        set.signs_map.insert("-", TokenType::MinusSign);
+        set.signs_map.insert("*", TokenType::MultiplySign);
+        set.signs_map.insert("/", TokenType::DivideSign);
+        set.signs_map.insert("%", TokenType::ModulusSign);
+        set.signs_map.insert("!", TokenType::NotSign);
+        set.signs_map.insert("=", TokenType::AssignmentSign);
+        set.signs_map.insert("==", TokenType::EqualSign);
+        set.signs_map.insert("!=", TokenType::InequalSign);
+        set.signs_map.insert(">", TokenType::GreaterThanSign);
+        set.signs_map.insert("<", TokenType::LessThanSign);
+        set.signs_map.insert("<=", TokenType::GreaterThanEqualSign);
+        set.signs_map.insert("<=", TokenType::LessThanEqualSign);
+        set.signs_map.insert(".", TokenType::Dot);
+        set.signs_map.insert(",", TokenType::Comma);
+        set.signs_map.insert(";", TokenType::SemiColon);
+        set.signs_map.insert("(", TokenType::LeftParenthese);
+        set.signs_map.insert(")", TokenType::RightParenthese);
+        for (sign, _) in &set.signs_map {
             for ch in sign.chars() {
                 set.signs_chars_set.insert(ch);
             }
@@ -44,8 +81,15 @@ impl TokenSign {
         set
     }
 
+    pub fn get_sign_type(&self, sign: &str) -> Option<TokenType> {
+        match self.signs_map.get(sign) {
+            Some(token) => Some(*token),
+            None => None
+        }
+    }
+
     pub fn is_valid_sign(&self, sign: &str) -> bool {
-        self.signs_set.contains(sign)
+        self.signs_map.contains_key(sign)
     }
 
     pub fn is_valid_sign_character(&self, ch: char) -> bool {

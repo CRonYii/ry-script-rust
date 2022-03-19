@@ -127,10 +127,10 @@ impl Lexer {
                 move_cursor: true,
                 error: None,
             }
-        } else if self.signs.is_valid_sign(&self.buffer) {
+        } else if let Some(token) = self.signs.get_sign_type(&self.buffer) {
             LexerResult {
                 state: LexerState::Normal,
-                create: Some(TokenType::Sign),
+                create: Some(token),
                 buffer: false,
                 move_cursor: false,
                 error: None,
