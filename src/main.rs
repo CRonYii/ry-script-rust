@@ -16,7 +16,7 @@ fn main() {
         print!("> ");
         match stdout().flush() {
             Ok(_) => (),
-            Err(error) => println!("{}", error),
+            Err(error) => eprintln!("stdout error: {}", error),
         }
         let _ = stdin().read_line(&mut line).unwrap();
         if line.starts_with(".exit") {
