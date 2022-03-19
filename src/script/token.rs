@@ -1,4 +1,4 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::vec::Vec;
 
@@ -50,7 +50,7 @@ impl TokenType {
     pub fn entity(self, value: &String) -> Token {
         Token {
             r#type: self,
-            value: value.clone()
+            value: value.clone(),
         }
     }
 }
@@ -66,7 +66,7 @@ impl TokenMap {
         let mut set = TokenMap {
             operator_map: HashMap::new(),
             keyword_map: HashMap::new(),
-            signs_chars_set: HashSet::new()
+            signs_chars_set: HashSet::new(),
         };
         // operators
         set.operator_map.insert("+", TokenType::Plus);
@@ -111,14 +111,14 @@ impl TokenMap {
     pub fn get_sign_type(&self, sign: &str) -> Option<TokenType> {
         match self.operator_map.get(sign) {
             Some(token) => Some(*token),
-            None => None
+            None => None,
         }
     }
 
     pub fn get_keyword_type(&self, sign: &str) -> Option<TokenType> {
         match self.keyword_map.get(sign) {
             Some(token) => Some(*token),
-            None => None
+            None => None,
         }
     }
 
@@ -142,16 +142,20 @@ impl Display for Tokens {
         for token in &self.0 {
             write!(f, "{} ", token.value)?;
             match token.r#type {
-                TokenType::SemiColon | TokenType::LeftCurlyBracket | TokenType::RightCurlyBracket => writeln!(f)?,
-                _ => ()
+                TokenType::SemiColon
+                | TokenType::LeftCurlyBracket
+                | TokenType::RightCurlyBracket => writeln!(f)?,
+                _ => (),
             }
         }
         writeln!(f)?;
         for token in &self.0 {
             write!(f, "{:?} ", token.r#type)?;
             match token.r#type {
-                TokenType::SemiColon | TokenType::LeftCurlyBracket | TokenType::RightCurlyBracket => writeln!(f)?,
-                _ => ()
+                TokenType::SemiColon
+                | TokenType::LeftCurlyBracket
+                | TokenType::RightCurlyBracket => writeln!(f)?,
+                _ => (),
             }
         }
         Ok(())

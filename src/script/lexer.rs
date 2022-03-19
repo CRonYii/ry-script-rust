@@ -1,4 +1,4 @@
-use super::token::{TokenType, Token, TokenMap, Tokens};
+use super::token::{Token, TokenMap, TokenType, Tokens};
 use std::mem::take;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -143,7 +143,10 @@ impl Lexer {
                 error: None,
             }
         } else {
-            LexerResult { error: Some(format!("Syntax error: Unexpected token {}", self.buffer)), ..Lexer::ERROR_RESULT }
+            LexerResult {
+                error: Some(format!("Syntax error: Unexpected token {}", self.buffer)),
+                ..Lexer::ERROR_RESULT
+            }
         }
     }
 
@@ -198,7 +201,8 @@ impl Lexer {
                 error: Some(format!("Syntax error: Unexpected EOF")),
                 ..Lexer::ERROR_RESULT
             },
-            '"' => LexerResult { // TODO implement escape character \"
+            '"' => LexerResult {
+                // TODO implement escape character \"
                 state: LexerState::Normal,
                 create: Some(TokenType::String),
                 buffer: false,
@@ -268,9 +272,7 @@ impl Lexer {
             move_cursor = self.parse_char(next_char);
         }
         match self.state {
-            LexerState::End => {
-                Ok(Tokens(take(&mut self.tokens)))
-            },
+            LexerState::End => Ok(Tokens(take(&mut self.tokens))),
             _ => Err(take(&mut self.error)),
         }
     }
