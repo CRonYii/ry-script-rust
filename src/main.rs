@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::io::*;
 
 mod math;
@@ -7,7 +6,7 @@ mod script;
 #[cfg(test)]
 mod math_tests;
 
-use script::grammar::GrammarSet;
+use script::grammar::{GrammarSet, TerminalSymbolDef};
 use script::lrparser::lr0_parse;
 use script::token::TokenType;
 
@@ -23,12 +22,13 @@ fn init_math_script_parser() {
         "B -> id",
         "B -> num",
     ];
-    let mut terminal_symbols = HashMap::new();
-    terminal_symbols.insert("*", TokenType::Multiply);
-    terminal_symbols.insert("+", TokenType::Plus);
-    terminal_symbols.insert("id", TokenType::Identifier);
-    terminal_symbols.insert("num", TokenType::Number);
-    terminal_symbols.insert("EOF", TokenType::EOF);
+    let terminal_symbols = vec![
+        TerminalSymbolDef("*", TokenType::Multiply),
+        TerminalSymbolDef("+", TokenType::Plus),
+        TerminalSymbolDef("id", TokenType::Identifier),
+        TerminalSymbolDef("num", TokenType::Number),
+        TerminalSymbolDef("EOF", TokenType::EOF),
+    ];
     let grmmar_set = match GrammarSet::from(grammars, terminal_symbols) {
         Ok(grammar_set) => grammar_set,
         Err(error) => panic!("Grammar parser error: {}", error),
