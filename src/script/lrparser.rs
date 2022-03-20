@@ -124,7 +124,7 @@ impl LRParser {
             let action = match self.transition_table.get(state) {
                 Some(row) => match row.get(&Symbol::Terminal(token.r#type)) {
                     Some(action) => action,
-                    None => return Err(format!("Parse Error: Unexpected token: {}", token.value)),
+                    None => return Err(format!("Parse Error: Unexpected token: {:?}", token.r#type)),
                 },
                 None => return Err(format!("Parse Error: state {} does not exist", state)),
             };
