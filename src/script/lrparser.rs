@@ -1,6 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
-    fmt::{write, Display},
+    fmt::Display,
     rc::Rc,
 };
 
@@ -10,19 +10,19 @@ use super::{
 };
 
 pub enum TransitionAction {
-    Shift(i32),
-    Reduce(i32),
-    Goto(i32),
+    Shift(usize),
+    Reduce(usize),
+    Goto(usize),
     Accept,
 }
 
 impl Display for TransitionAction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TransitionAction::Shift(s) => write!(f, "s{}", s)?,
-            TransitionAction::Reduce(r) => write!(f, "r{}", r)?,
-            TransitionAction::Goto(r) => write!(f, "{}", r)?,
-            TransitionAction::Accept => write!(f, "acc")?,
+            TransitionAction::Shift(s) => write!(f, "shift {}", s)?,
+            TransitionAction::Reduce(r) => write!(f, "reduce {}", r)?,
+            TransitionAction::Goto(r) => write!(f, "goto {}", r)?,
+            TransitionAction::Accept => write!(f, "accept")?,
         }
         Ok(())
     }
@@ -138,7 +138,12 @@ pub fn lr0_parse(grammar_set: &GrammarSet) -> Result<TransitionTable, String> {
                         _ => (/* do nothing for terminal symbols */),
                     }
                 }
-                _ => (/* TODO reduce */),
+                _ => grammar_set.terminal_symbols.iter().for_each(|(_, symbol)| {
+                    transition_row.insert(
+                        Rc::clone(symbol),
+                        TransitionAction::Reduce(kernel.grammar.rule_number),
+                    );
+                }),
             }
             i += 1;
         }
@@ -171,11 +176,19 @@ pub fn lr0_parse(grammar_set: &GrammarSet) -> Result<TransitionTable, String> {
                 Some(idx) => idx as i32,
             };
             let action_value = match state == -1 {
-                true => item_sets.len() as i32,
-                false => state,
+                true => item_sets.len(),
+                false => state as usize,
             };
             // shift/goto
-            transition_row.insert(symbol, TransitionAction::Shift(action_value));
+            match *symbol {
+                Symbol::Terminal(_) => {
+                    transition_row.insert(symbol, TransitionAction::Shift(action_value))
+                }
+                Symbol::NonTerminal(_) => {
+                    transition_row.insert(symbol, TransitionAction::Goto(action_value))
+                }
+            };
+
             // add brand new itemset
             if state == -1 {
                 item_sets.push(itemset);

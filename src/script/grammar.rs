@@ -18,10 +18,17 @@ impl Display for Symbol {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Hash, Eq)]
 pub struct Grammar {
+    pub rule_number: usize,
     pub lval: Rc<Symbol>,
     pub rvals: Vec<Rc<Symbol>>,
+}
+
+impl PartialEq for Grammar {
+    fn eq(&self, other: &Self) -> bool {
+        self.rule_number == other.rule_number
+    }
 }
 
 impl Display for Grammar {
@@ -117,7 +124,11 @@ impl GrammarSet {
             Some(rvals) => rvals,
             None => return Err(format!("{} rvals contains invalid symbol", text)),
         };
-        let grammar = Rc::new(Grammar { lval, rvals });
+        let grammar = Rc::new(Grammar {
+            rule_number: self.grammars.len() + 1,
+            lval,
+            rvals,
+        });
         #[cfg(debug_assertions)]
         println!("Parsed grammar: {}", grammar);
         self.grammars.push(grammar);
