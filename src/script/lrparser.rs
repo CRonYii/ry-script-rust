@@ -1,6 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
-    fmt::Display,
+    fmt::{write, Display},
     rc::Rc,
 };
 
@@ -10,10 +10,22 @@ use super::{
 };
 
 pub enum TransitionAction {
-    Shift(usize),
-    Reduce(usize),
-    Goto(usize),
+    Shift(i32),
+    Reduce(i32),
+    Goto(i32),
     Accept,
+}
+
+impl Display for TransitionAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransitionAction::Shift(s) => write!(f, "s{}", s)?,
+            TransitionAction::Reduce(r) => write!(f, "r{}", r)?,
+            TransitionAction::Goto(r) => write!(f, "{}", r)?,
+            TransitionAction::Accept => write!(f, "acc")?,
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -32,8 +44,10 @@ impl ItemSet {
             None => false,
         }
     }
+}
 
-    fn equal(&self, other: &ItemSet) -> bool {
+impl PartialEq for ItemSet {
+    fn eq(&self, other: &Self) -> bool {
         self.items.iter().filter(|&k| !other.has(k)).count() == 0
     }
 }
@@ -150,18 +164,24 @@ pub fn lr0_parse(grammar_set: &GrammarSet) -> Result<TransitionTable, String> {
         }
         #[cfg(debug_assertions)]
         println!("Parsed Itemset {}: {}\n", transition_table.len(), item_set);
-        transition_table.push(transition_row);
-        // TODO: shift/goto action
         // add new itemsets to vector
-        let mut newsets: Vec<ItemSet> = new_itemsets
-            .into_iter()
-            .map(|(_, value)| value)
-            .filter(|x| match item_sets.iter().find(|&y| x.equal(y)) {
-                None => true,
-                _ => false,
-            })
-            .collect();
-        item_sets.append(&mut newsets);
+        new_itemsets.into_iter().for_each(|(symbol, itemset)| {
+            let state = match item_sets.iter().position(|set| itemset == *set) {
+                None => -1,
+                Some(idx) => idx as i32,
+            };
+            let action_value = match state == -1 {
+                true => item_sets.len() as i32,
+                false => state,
+            };
+            // shift/goto
+            transition_row.insert(symbol, TransitionAction::Shift(action_value));
+            // add brand new itemset
+            if state == -1 {
+                item_sets.push(itemset);
+            }
+        });
+        transition_table.push(transition_row);
         item_set_idx += 1;
     }
     Ok(transition_table)
