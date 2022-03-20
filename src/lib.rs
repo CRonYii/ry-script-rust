@@ -4,12 +4,13 @@ mod script;
 #[cfg(test)]
 mod math_tests;
 
+pub use math::matrix::Matrix;
+
+use script::ast::ASTNode;
 use script::grammar::{GrammarSet, TerminalSymbolDef};
+use script::lexer::Lexer;
 use script::lrparser::LRParser;
 use script::token::TokenType;
-
-pub use crate::math::matrix::*;
-pub use crate::script::lexer::Lexer;
 
 pub struct ScriptParser {
     lexer: Lexer,
@@ -17,12 +18,11 @@ pub struct ScriptParser {
 }
 
 impl ScriptParser {
-    pub fn parse(&mut self, input: &String) -> Result<(), String> {
+    pub fn parse(&mut self, input: &String) -> Result<ASTNode, String> {
         let tokens = self.lexer.parse(input)?;
         #[cfg(debug_assertions)]
         println!("{}", tokens);
-        self.lr_parser.parse(tokens)?;
-        Ok(())
+        Ok(self.lr_parser.parse(tokens)?)
     }
 }
 

@@ -17,7 +17,7 @@ fn main() {
             break;
         }
         match lr_parser.parse(&line) {
-            Ok(_) => (),
+            Ok(node) => println!("> {}", node),
             Err(err) => eprintln!("{}", err),
         }
         line.clear();

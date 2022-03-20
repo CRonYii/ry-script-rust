@@ -5,6 +5,7 @@ use std::{
 };
 
 use super::{
+    ast::ASTNode,
     grammar::{Grammar, GrammarSet, Symbol},
     token::{TokenType, Tokens},
 };
@@ -101,22 +102,16 @@ pub struct LRParser {
 }
 
 impl LRParser {
-    pub fn parse(&self, tokens: Tokens) -> Result<(), String> {
+    pub fn parse(&self, tokens: Tokens) -> Result<ASTNode, String> {
         /* parse stack initial state 0 */
         let mut parse_stack = Vec::from([0]);
+        let mut ast_stack = Vec::<ASTNode>::new();
         let mut iter = tokens.0.into_iter();
-        let mut next_char = false;
         let mut token = match iter.next() {
             Some(token) => token,
             None => return Err(format!("Parse Error: Incorrect syntax")),
         };
         while parse_stack.len() != 0 {
-            if next_char {
-                token = match iter.next() {
-                    Some(token) => token,
-                    None => return Err(format!("Parse Error: Incorrect syntax")),
-                };
-            }
             let state = match parse_stack.last() {
                 Some(&state) => state,
                 None => return Err(format!("Parse Error: stack is empty when peek")),
@@ -124,17 +119,23 @@ impl LRParser {
             let action = match self.transition_table.get(state) {
                 Some(row) => match row.get(&Symbol::Terminal(token.r#type)) {
                     Some(action) => action,
-                    None => return Err(format!("Parse Error: Unexpected token: {:?}", token.r#type)),
+                    None => {
+                        return Err(format!("Parse Error: Unexpected token: {:?}", token.r#type))
+                    }
                 },
                 None => return Err(format!("Parse Error: state {} does not exist", state)),
             };
             #[cfg(debug_assertions)]
             println!("{:?} -> [{}] {}", token.r#type, state, action);
-            next_char = match action {
+            match action {
                 TransitionAction::Shift(state) => {
                     parse_stack.push(*state);
-                    /* TODO: push AST stack */
-                    true
+                    /* push AST stack */
+                    ast_stack.push(ASTNode::ValueNode(token));
+                    token = match iter.next() {
+                        Some(token) => token,
+                        None => return Err(format!("Parse Error: Incorrect syntax")),
+                    };
                 }
                 TransitionAction::Reduce(rule_number) => {
                     let grammar = match self.grammar_set.grammars.get(*rule_number - 1) {
@@ -146,11 +147,18 @@ impl LRParser {
                             ))
                         }
                     };
-                    /* TODO: pop AST stack to form AST params and the push a new AST expression */
+                    /* pop AST stack to form AST params and the push a new AST expression */
                     if grammar.rvals.len() > parse_stack.len() {
                         return Err(format!("Parse Error: stack does not have enough items"));
                     }
-                    parse_stack.truncate(parse_stack.len() - grammar.rvals.len());
+                    /* Pop rvals.len() items */
+                    let remains = ast_stack.len() - grammar.rvals.len();
+                    let ast_node = ASTNode::ExpressionNode(ast_stack.drain(remains..).collect());
+                    #[cfg(debug_assertions)]
+                    println!("Reduce expr -> {}", ast_node);
+                    ast_stack.push(ast_node);
+                    let remains = parse_stack.len() - grammar.rvals.len();
+                    parse_stack.truncate(remains);
                     /* Perform GOTO */
                     let state = match parse_stack.last() {
                         Some(&state) => state,
@@ -169,9 +177,21 @@ impl LRParser {
                         None => return Err(format!("Parse Error: state {} does not exist", state)),
                     };
                     parse_stack.push(*goto_state);
-                    false
                 }
-                TransitionAction::Accept => return Ok((/* TODO: Return an AST expression */)),
+                TransitionAction::Accept => {
+                    /* AST stack should have exactly 1 item left, which is the returned expression */
+                    if let Some(expr) = ast_stack.pop() {
+                        if ast_stack.len() != 0 {
+                            return Err(format!(
+                                "Parse Error: Accepted but ast stack still has items left\n{:?}",
+                                ast_stack
+                            ));
+                        }
+                        return Ok(expr);
+                    } else {
+                        return Err(format!("Parse Error: Accepted but ast stack is empty"));
+                    }
+                }
                 TransitionAction::Goto(_) => {
                     return Err(format!("Parse Error: Unexpected goto action"))
                 }
