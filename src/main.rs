@@ -24,17 +24,16 @@ fn init_math_script_parser() {
         "B -> num",
     ];
     let mut terminal_symbols = HashMap::new();
-    terminal_symbols.insert("id", TokenType::Identifier);
-    terminal_symbols.insert("num", TokenType::Number);
     terminal_symbols.insert("*", TokenType::Multiply);
     terminal_symbols.insert("+", TokenType::Plus);
+    terminal_symbols.insert("id", TokenType::Identifier);
+    terminal_symbols.insert("num", TokenType::Number);
     terminal_symbols.insert("EOF", TokenType::EOF);
-    let grmmar_set =
-        match GrammarSet::from("S -> E EOF", grammars, terminal_symbols, TokenType::EOF) {
-            Ok(grammar_set) => grammar_set,
-            Err(error) => panic!("Grammar parser error: {}", error),
-        };
-    lr0_parse(&grmmar_set);
+    let grmmar_set = match GrammarSet::from(grammars, terminal_symbols) {
+        Ok(grammar_set) => grammar_set,
+        Err(error) => panic!("Grammar parser error: {}", error),
+    };
+    lr0_parse(&grmmar_set).unwrap();
 }
 
 fn main() {

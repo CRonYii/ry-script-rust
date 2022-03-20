@@ -5,45 +5,57 @@ use std::{
 
 use super::token::TokenType;
 
-#[derive(Debug)]
-enum Symbol {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Symbol {
     NonTerminal(&'static str),
-    Termial(TokenType),
+    Terminal(TokenType),
+}
+
+impl Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Symbol::NonTerminal(s) => write!(f, "{}", s)?,
+            Symbol::Terminal(t) => write!(f, "{:?}", t)?,
+        }
+        Ok(())
+    }
 }
 
 pub struct Grammar {
-    lval: Symbol,
-    rvals: Vec<Symbol>,
+    pub lval: Symbol,
+    pub rvals: Vec<Symbol>,
+}
+
+impl Grammar {
+    pub fn equal(&self, other: &Grammar) -> bool {
+        self.lval == other.lval &&
+        self.rvals == other.rvals
+    }
 }
 
 impl Display for Grammar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Grammar: {:?} -> ", self.lval)?;
+        write!(f, "{} -> ", self.lval)?;
         for rval in &self.rvals {
-            write!(f, "{:?} ", rval)?
+            write!(f, "{} ", rval)?
         }
         Ok(())
     }
 }
 
 pub struct GrammarSet {
-    pub start_grammar: Grammar,
     pub grammars: Vec<Grammar>,
-    pub n_non_terminal_symbols: usize,
-    pub n_terminal_symbols: usize,
-    pub end_token: TokenType,
 }
 
 impl GrammarSet {
+    /* Pre-condition: The first grammar is expected to be the starter grammar */
     pub fn from(
-        start_grammar_text: &'static str,
-        grammars: Vec<&'static str>,
+        grammars_text: Vec<&'static str>,
         terminal_symbols: HashMap<&'static str, TokenType>,
-        end_token: TokenType,
     ) -> Result<GrammarSet, String> {
         // non-terminal symbols
         let mut non_terminal_symbols = HashSet::new();
-        for text in &grammars {
+        for text in &grammars_text {
             let mut tokens = text.split(" ");
             let lval = match tokens.next() {
                 Some(token) => token,
@@ -54,7 +66,7 @@ impl GrammarSet {
         // symbol getter closure
         let get_symbol = |symbol: &'_ str| -> Option<Symbol> {
             if let Some(terminal_symbol) = terminal_symbols.get(symbol) {
-                Some(Symbol::Termial(*terminal_symbol))
+                Some(Symbol::Terminal(*terminal_symbol))
             } else if let Some(non_terminal_symbol) = non_terminal_symbols.get(symbol) {
                 Some(Symbol::NonTerminal(*non_terminal_symbol))
             } else {
@@ -97,19 +109,19 @@ impl GrammarSet {
             };
             let grammar = Grammar { lval, rvals };
             #[cfg(debug_assertions)]
-            println!("{}", grammar);
+            println!("Parsed grammar: {}", grammar);
             Ok(grammar)
         };
-        let grammar_rules = grammars
+        let grammars = grammars_text
             .iter()
             .map(|text| parse_grammar(*text))
             .collect::<Result<Vec<_>, String>>()?;
         Ok(GrammarSet {
-            start_grammar: parse_grammar(start_grammar_text)?,
-            grammars: grammar_rules,
-            n_non_terminal_symbols: non_terminal_symbols.len(),
-            n_terminal_symbols: terminal_symbols.len(),
-            end_token,
+            grammars,
         })
+    }
+
+    pub fn find_grammars(&self, lval: Symbol) -> Vec<&Grammar> {
+        self.grammars.iter().filter(|&g| g.lval == lval).collect()
     }
 }
