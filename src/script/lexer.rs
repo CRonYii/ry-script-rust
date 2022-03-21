@@ -168,7 +168,7 @@ impl Lexer {
             },
             _ => LexerResult {
                 state: LexerState::Normal,
-                create: Some(TokenType::Number),
+                create: Some(TokenType::Integer),
                 buffer: false,
                 move_cursor: false,
                 error: None,
@@ -187,7 +187,7 @@ impl Lexer {
             },
             _ => LexerResult {
                 state: LexerState::Normal,
-                create: Some(TokenType::Number),
+                create: Some(TokenType::Float),
                 buffer: false,
                 move_cursor: false,
                 error: None,

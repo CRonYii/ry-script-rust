@@ -4,7 +4,13 @@ use ry_mathr::init_math_script_parser;
 
 fn main() {
     use std::io::Write;
-    let mut lr_parser = init_math_script_parser().unwrap();
+    let mut lr_parser = match init_math_script_parser() {
+        Ok(lr_parser) => lr_parser,
+        Err(err) => {
+            eprintln!("Failed during initialization: {}", err);
+            std::process::exit(1);
+        }
+    };
     let mut line = String::new();
     loop {
         print!("> ");

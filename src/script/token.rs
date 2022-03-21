@@ -2,10 +2,13 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::vec::Vec;
 
+use super::ast::ASTNode;
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum TokenType {
     Identifier,
-    Number,
+    Integer,
+    Float,
     String,
     If,
     Else,
@@ -44,6 +47,15 @@ pub enum TokenType {
 pub struct Token {
     pub r#type: TokenType,
     pub value: String,
+}
+
+impl Token {
+    pub fn value(self) -> ASTNode {
+        match self.r#type {
+            TokenType::Integer => ASTNode::Integer(self.value.parse().unwrap()),
+            _ => panic!("{:?} cannot be converted to a value", self.r#type),
+        }
+    }
 }
 
 impl TokenType {

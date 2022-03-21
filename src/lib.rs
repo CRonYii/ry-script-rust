@@ -6,11 +6,11 @@ mod math_tests;
 
 pub use math::matrix::Matrix;
 
-use script::ast::{ASTNode, GrammarReducer};
+use script::ast::{ASTNode, ExpressionReducer, GrammarReducer};
 use script::grammar::{GrammarSet, Symbol, TerminalSymbolDef};
 use script::lexer::Lexer;
 use script::lrparser::{LRParser, TransitionAction};
-use script::token::{TokenType, Tokens};
+use script::token::{Token, TokenType, Tokens};
 
 pub struct ScriptParser {
     lexer: Lexer,
@@ -19,6 +19,22 @@ pub struct ScriptParser {
 }
 
 impl ScriptParser {
+    pub fn from(
+        lr_parser: LRParser,
+        reducer: GrammarReducer,
+    ) -> Result<ScriptParser, &'static str> {
+        if reducer.len() != lr_parser.grammar_set.grammars.len() - 1 {
+            return Err(
+                "Parser should have the same number of reducers as the number of grammer rules (starter grammar does not count).",
+            );
+        }
+        Ok(ScriptParser {
+            lexer: Lexer::new(),
+            lr_parser,
+            reducer,
+        })
+    }
+
     pub fn parse(&mut self, input: &String) -> Result<ASTNode, String> {
         let tokens = self.lexer.parse(input)?;
         #[cfg(debug_assertions)]
@@ -49,14 +65,15 @@ impl ScriptParser {
                 TransitionAction::Shift(state) => {
                     parse_stack.push(*state);
                     /* push AST stack */
-                    ast_stack.push(ASTNode::ValueNode(token));
+                    ast_stack.push(ASTNode::Token(token));
                     token = match iter.next() {
                         Some(token) => token,
                         None => return Err(format!("Parse Error: Incorrect syntax")),
                     };
                 }
                 TransitionAction::Reduce(rule_number) => {
-                    let grammar = match self.lr_parser.grammar_set.grammars.get(*rule_number - 1) {
+                    let rule_idx = rule_number - 1;
+                    let grammar = match self.lr_parser.grammar_set.grammars.get(rule_idx) {
                         Some(grammar) => grammar,
                         None => {
                             return Err(format!(
@@ -71,9 +88,10 @@ impl ScriptParser {
                     }
                     /* Pop rvals.len() items */
                     let remains = ast_stack.len() - grammar.rvals.len();
-                    let ast_node = ASTNode::ExpressionNode(ast_stack.drain(remains..).collect());
+                    let params = ast_stack.drain(remains..).collect::<Vec<_>>();
+                    let ast_node = self.reducer[rule_idx - 1](params);
                     #[cfg(debug_assertions)]
-                    println!("Reduce expr -> {}", ast_node);
+                    println!("Reduce [{}. {}] -> {}", rule_number, grammar, ast_node);
                     ast_stack.push(ast_node);
                     let remains = parse_stack.len() - grammar.rvals.len();
                     parse_stack.truncate(remains);
@@ -98,8 +116,7 @@ impl ScriptParser {
                     if let Some(expr) = ast_stack.pop() {
                         if ast_stack.len() != 0 {
                             return Err(format!(
-                                "Parse Error: Accepted but ast stack still has items left\n{:?}",
-                                ast_stack
+                                "Parse Error: Accepted but ast stack still has items left",
                             ));
                         }
                         return Ok(expr);
@@ -116,30 +133,57 @@ impl ScriptParser {
     }
 }
 
+pub fn multiply_reducer(args: Vec<ASTNode>) -> ASTNode {
+    ASTNode::ActionExpression(
+        "a * b",
+        Box::new(move || -> ASTNode {
+            let left = &args[0];
+            let right = &args[2];
+            ASTNode::Token(Token {
+                value: format!("{} * {}", left, right),
+                r#type: TokenType::Integer,
+            })
+        }),
+    )
+}
+
+pub fn add_reducer(args: Vec<ASTNode>) -> ASTNode {
+    ASTNode::ActionExpression(
+        "a + b",
+        Box::new(move || -> ASTNode {
+            let left = &args[0];
+            let right = &args[2];
+            ASTNode::Token(Token {
+                value: format!("{} * {}", left, right),
+                r#type: TokenType::Integer,
+            })
+        }),
+    )
+}
+
+pub fn value_reducer(mut args: Vec<ASTNode>) -> ASTNode {
+    args.pop().unwrap().value()
+}
+
 pub fn init_math_script_parser() -> Result<ScriptParser, String> {
-    let reducer = vec![];
+    let reducer: Vec<ExpressionReducer> =
+        vec![multiply_reducer, add_reducer, value_reducer, value_reducer];
     let grammars = [
         "S -> E EOF",
         "E -> E * B",
         "E -> E + B",
         "E -> B",
-        "B -> id",
-        "B -> num",
+        "B -> int",
     ];
     let terminal_symbols = [
         TerminalSymbolDef("*", TokenType::Multiply),
         TerminalSymbolDef("+", TokenType::Plus),
-        TerminalSymbolDef("id", TokenType::Identifier),
-        TerminalSymbolDef("num", TokenType::Number),
+        TerminalSymbolDef("int", TokenType::Integer),
         TerminalSymbolDef("EOF", TokenType::EOF),
     ];
     let grammar_set = GrammarSet::from(&grammars, &terminal_symbols)?;
-    let transition_table = LRParser::lr0(grammar_set)?;
-    // #[cfg(debug_assertions)]
-    // println!("{}", transition_table);
-    Ok(ScriptParser {
-        lexer: Lexer::new(),
-        lr_parser: transition_table,
-        reducer,
-    })
+    let lr_parser = LRParser::lr0(grammar_set)?;
+    #[cfg(debug_assertions)]
+    println!("{}", lr_parser);
+    Ok(ScriptParser::from(lr_parser, reducer)?)
 }
