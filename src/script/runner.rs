@@ -56,7 +56,10 @@ impl ScriptRunner {
                 .lr_parser
                 .get_action(state, &Symbol::Terminal(token.r#type))?;
             #[cfg(feature = "debug_lrparser")]
-            println!("{:?} -> [{}] {}\n  AST stack{:?}", token.r#type, state, action, ast_stack);
+            println!(
+                "{:?} -> [{}] {}\n  AST stack{:?}",
+                token.r#type, state, action, ast_stack
+            );
             match action {
                 TransitionAction::Shift(state) => {
                     parse_stack.push(*state);
@@ -145,11 +148,44 @@ impl ReducerArg {
         self.args.pop().unwrap().evaluate()
     }
 
+    pub fn nth_eval(&mut self, n: usize) -> Result<ASTNode, String> {
+        self.nth_node(n).evaluate()
+    }
+
+    pub fn eval_skip(&mut self, n: usize) -> Result<ASTNode, String> {
+        let node = self.eval();
+        self.skip_n(n);
+        node
+    }
+
     pub fn val(&mut self) -> ASTNode {
         self.args.pop().unwrap().value()
     }
 
+    pub fn nth_val(&mut self, n: usize) -> ASTNode {
+        self.nth_node(n).value()
+    }
+
+    pub fn val_skip(&mut self, n: usize) -> ASTNode {
+        let node = self.val();
+        self.skip_n(n);
+        node
+    }
+
+    fn nth_node(&mut self, n: usize) -> ASTNode {
+        for _ in 0..n {
+            self.skip()
+        }
+        self.args.pop().unwrap()
+    }
+
     pub fn skip(&mut self) {
         self.args.pop();
+    }
+
+    pub fn skip_n(&mut self, n: usize) {
+        for _ in 0..n {
+            self.skip()
+        }
     }
 }

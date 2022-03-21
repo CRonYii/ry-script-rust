@@ -15,19 +15,22 @@ fn multiply_reducer(mut args: ReducerArg) -> ASTNode {
     ASTNode::ActionExpression(
         "a * b",
         Box::new(move || {
-            let (lhs, _, rhs) = (args.eval()?, args.skip(), args.eval()?);
+            let (lhs, rhs) = (args.eval_skip(1)?, args.eval()?);
             #[cfg(feature = "debug_ast")]
             println!("eval {:?} * {:?}", lhs, rhs);
             match lhs {
                 ASTNode::Integer(lhs) => {
                     let val = lhs * rhs.int()?;
                     Ok(ASTNode::Integer(val))
-                },
+                }
                 ASTNode::Float(lhs) => {
                     let val = lhs * rhs.float()?;
                     Ok(ASTNode::Float(val))
-                },
-                _ => Err(format!("Runtime Error: {:?} does not support multiplication", lhs))
+                }
+                _ => Err(format!(
+                    "Runtime Error: {:?} does not support multiplication",
+                    lhs
+                )),
             }
         }),
     )
@@ -37,27 +40,25 @@ fn add_reducer(mut args: ReducerArg) -> ASTNode {
     ASTNode::ActionExpression(
         "a + b",
         Box::new(move || {
-            let (lhs, _, rhs) = (args.eval()?, args.skip(), args.eval()?);
+            let (lhs, rhs) = (args.eval_skip(1)?, args.eval()?);
             #[cfg(feature = "debug_ast")]
             println!("eval {:?} + {:?}", lhs, rhs);
             match lhs {
                 ASTNode::Integer(lhs) => {
                     let val = lhs + rhs.int()?;
                     Ok(ASTNode::Integer(val))
-                },
+                }
                 ASTNode::Float(lhs) => {
                     let val = lhs + rhs.float()?;
                     Ok(ASTNode::Float(val))
-                },
-                _ => Err(format!("Runtime Error: {:?} does not support addition", lhs))
+                }
+                _ => Err(format!(
+                    "Runtime Error: {:?} does not support addition",
+                    lhs
+                )),
             }
         }),
     )
-}
-
-fn parenthesis_reducer(mut args: ReducerArg) -> ASTNode {
-    args.skip();
-    args.val()
 }
 
 pub fn init_math_script_parser() -> Result<ScriptRunner, String> {
@@ -69,9 +70,10 @@ pub fn init_math_script_parser() -> Result<ScriptRunner, String> {
         GrammarRule("A2 -> A3", value_reducer),
         GrammarRule("A2 -> A2 * A3", multiply_reducer),
         GrammarRule("A3 -> Val", value_reducer),
-        GrammarRule("Val -> int", value_reducer),
-        GrammarRule("Val -> float", value_reducer),
-        GrammarRule("Val -> ( A1 )", parenthesis_reducer),
+        GrammarRule("Val -> num", value_reducer),
+        GrammarRule("num -> int", value_reducer),
+        GrammarRule("num -> float", value_reducer),
+        GrammarRule("Val -> ( A1 )", |mut args| args.nth_val(1)),
     ];
     let terminal_symbols = [
         TerminalSymbolDef("(", TokenType::LeftParenthese),
