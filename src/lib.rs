@@ -66,7 +66,7 @@ impl Value {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Ok(Value::Integer(lhs * rhs)),
                 Value::Float(rhs) => Ok(Value::Float((lhs as f64) * rhs)),
-                Value::String(_) => Err(format!("Runtime Error: Multiplication is not implemented for {:?}", self)),
+                Value::String(_) => Err(format!("Runtime Error: Multiplication is not implemented for {:?}", rhs)),
             },
             Value::Float(lhs) => {
                 let val = lhs * rhs.float()?;
@@ -81,7 +81,7 @@ impl Value {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Ok(Value::Integer(lhs + rhs)),
                 Value::Float(rhs) => Ok(Value::Float((lhs as f64) + rhs)),
-                Value::String(_) => Err(format!("Runtime Error: Addition is not implemented for {:?}", self)),
+                Value::String(_) => Err(format!("Runtime Error: Addition is not implemented for {:?}", rhs)),
             },
             Value::Float(lhs) => {
                 let val = lhs + rhs.float()?;
