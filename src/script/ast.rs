@@ -13,7 +13,7 @@ pub fn never_reducer(_: ReducerArg) -> ASTNode {
 }
 
 pub fn value_reducer(mut args: ReducerArg) -> ASTNode {
-    args.eval().unwrap()
+    args.val()
 }
 
 pub enum ASTNode {
@@ -27,8 +27,14 @@ impl ASTNode {
     pub fn evaluate(self) -> Result<ASTNode, String> {
         match self {
             ASTNode::ActionExpression(_, mut action) => action(),
-            ASTNode::Token(token) => Ok(token.value()),
             _ => Ok(self),
+        }
+    }
+    
+    pub fn value(self) -> ASTNode {
+        match self {
+            ASTNode::Token(token) => token.value(),
+            _ => self,
         }
     }
 

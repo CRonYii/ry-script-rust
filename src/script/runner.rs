@@ -145,6 +145,10 @@ impl ReducerArg {
         self.args.pop().unwrap().evaluate()
     }
 
+    pub fn val(&mut self) -> ASTNode {
+        self.args.pop().unwrap().value()
+    }
+
     pub fn skip(&mut self) {
         self.args.pop();
     }
