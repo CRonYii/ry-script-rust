@@ -36,9 +36,10 @@ pub fn multiply_reducer(mut args: ReducerArg) -> ASTNode {
 pub fn init_math_script_parser() -> Result<ScriptRunner, String> {
     let grammars: Vec<GrammarRule> = vec![
         GrammarRule("S -> E EOF", never_reducer),
-        GrammarRule("E -> E * E", multiply_reducer),
-        GrammarRule("E -> int", value_reducer),
-        GrammarRule("E -> float", value_reducer),
+        GrammarRule("E -> E * B", multiply_reducer),
+        GrammarRule("E -> B", value_reducer),
+        GrammarRule("B -> int", value_reducer),
+        GrammarRule("B -> float", value_reducer),
     ];
     let terminal_symbols = [
         TerminalSymbolDef("*", TokenType::Multiply),
