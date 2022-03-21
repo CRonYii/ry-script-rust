@@ -54,8 +54,8 @@ pub struct GrammarSet {
 impl GrammarSet {
     /* Pre-condition: The first grammar is expected to be the starter grammar */
     pub fn from(
-        grammars_text: Vec<&'static str>,
-        terminals: Vec<TerminalSymbolDef>,
+        grammars_text: &[&'static str],
+        terminals: &[TerminalSymbolDef],
     ) -> Result<GrammarSet, String> {
         // terminal symbols
         let mut terminal_symbols = HashMap::new();
@@ -65,7 +65,7 @@ impl GrammarSet {
         });
         // non-terminal symbols
         let mut non_terminal_symbols = HashMap::new();
-        for text in &grammars_text {
+        for text in grammars_text {
             let mut tokens = text.split(" ");
             let lval = match tokens.next() {
                 Some(token) => token,
@@ -78,7 +78,7 @@ impl GrammarSet {
             terminal_symbols,
             non_terminal_symbols,
         };
-        for text in &grammars_text {
+        for text in grammars_text {
             grammar.parse_grammar(text)?;
         }
         Ok(grammar)

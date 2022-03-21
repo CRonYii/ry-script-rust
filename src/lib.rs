@@ -1,5 +1,5 @@
-mod math;
-mod script;
+pub mod math;
+pub mod script;
 
 #[cfg(test)]
 mod math_tests;
@@ -27,7 +27,7 @@ impl ScriptParser {
 }
 
 pub fn init_math_script_parser() -> Result<ScriptParser, String> {
-    let grammars = vec![
+    let grammars = [
         "S -> E EOF",
         "E -> E * B",
         "E -> E + B",
@@ -35,14 +35,14 @@ pub fn init_math_script_parser() -> Result<ScriptParser, String> {
         "B -> id",
         "B -> num",
     ];
-    let terminal_symbols = vec![
+    let terminal_symbols = [
         TerminalSymbolDef("*", TokenType::Multiply),
         TerminalSymbolDef("+", TokenType::Plus),
         TerminalSymbolDef("id", TokenType::Identifier),
         TerminalSymbolDef("num", TokenType::Number),
         TerminalSymbolDef("EOF", TokenType::EOF),
     ];
-    let grammar_set = GrammarSet::from(grammars, terminal_symbols)?;
+    let grammar_set = GrammarSet::from(&grammars, &terminal_symbols)?;
     let lr_parser = LRParser::lr0_parser(grammar_set)?;
     #[cfg(debug_assertions)]
     println!("{}", lr_parser);
