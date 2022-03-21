@@ -15,6 +15,7 @@ impl RuntimeValue for Value {}
 
 #[derive(Debug)]
 pub enum Value {
+    String(String),
     Integer(i64),
     Float(f64),
 }
@@ -22,6 +23,7 @@ pub enum Value {
 impl std::convert::From<Token> for Value {
     fn from(token: Token) -> Self {
         match token.r#type {
+            TokenType::String => Value::String(token.value),
             TokenType::Integer => Value::Integer(token.value.parse().unwrap()),
             TokenType::Float => Value::Float(token.value.parse().unwrap()),
             _ => panic!("Parser Error: Unexpcted token {:?} cannot be converted to a value", token.r#type),
@@ -34,6 +36,7 @@ impl std::fmt::Display for Value {
         match self {
             Value::Integer(num) => write!(f, "{}", num)?,
             Value::Float(num) => write!(f, "{}", num)?,
+            Value::String(str) => write!(f, "{}", str)?,
         }
         Ok(())
     }
@@ -44,7 +47,7 @@ impl Value {
         match self {
             Value::Integer(val) => Ok(val),
             Value::Float(val) => Ok(val as i64),
-            // _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
+            _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
         }
     }
 
@@ -52,7 +55,7 @@ impl Value {
         match self {
             Value::Integer(val) => Ok(val as f64),
             Value::Float(val) => Ok(val),
-            // _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
+            _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
         }
     }
 }
@@ -63,11 +66,13 @@ impl Value {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Ok(Value::Integer(lhs * rhs)),
                 Value::Float(rhs) => Ok(Value::Float((lhs as f64) * rhs)),
+                Value::String(_) => Err(format!("Runtime Error: Multiplication is not implemented for {:?}", self)),
             },
             Value::Float(lhs) => {
                 let val = lhs * rhs.float()?;
                 Ok(Value::Float(val))
-            }
+            },
+            Value::String(_) => Err(format!("Runtime Error: Multiplication is not implemented for {:?}", self)),
         }
     }
 
@@ -76,11 +81,21 @@ impl Value {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Ok(Value::Integer(lhs + rhs)),
                 Value::Float(rhs) => Ok(Value::Float((lhs as f64) + rhs)),
+                Value::String(_) => Err(format!("Runtime Error: Addition is not implemented for {:?}", self)),
             },
             Value::Float(lhs) => {
                 let val = lhs + rhs.float()?;
                 Ok(Value::Float(val))
-            }
+            },
+            Value::String(_) => Err(format!("Runtime Error: Addition is not implemented for {:?}", self)),
+        }
+    }
+
+    pub fn negative(self) -> Result<Value, String> {
+        match self {
+            Value::Integer(val) => Ok(Value::Integer(-val)),
+            Value::Float(val) => Ok(Value::Float(-val)),
+            Value::String(_) => Err(format!("Runtime Error: Negative is not implemented for {:?}", self)),
         }
     }
 }
@@ -113,6 +128,20 @@ fn add_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
     )
 }
 
+fn negative_number_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
+    ASTNode::ActionExpression(
+        "a + b",
+        Box::new(move || match args.nth_eval(1)? {
+            ASTNode::Value(val) => {
+                #[cfg(feature = "debug_ast")]
+                println!("eval - {:?}", val);
+                Ok(ASTNode::Value(val.negative()?))
+            }
+            _ => panic!("Parse Error: Reducer expected value but non-value were given"),
+        }),
+    )
+}
+
 pub fn init_math_script_parser() -> Result<ScriptRunner<Value>, String> {
     let grammars: Vec<GrammarRule<Value>> = vec![
         GrammarRule("B -> S EOF", never_reducer),
@@ -122,7 +151,10 @@ pub fn init_math_script_parser() -> Result<ScriptRunner<Value>, String> {
         GrammarRule("A2 -> A3", value_reducer),
         GrammarRule("A2 -> A2 * A3", multiply_reducer),
         GrammarRule("A3 -> Val", value_reducer),
+        GrammarRule("Val -> str", value_reducer),
         GrammarRule("Val -> num", value_reducer),
+        GrammarRule("Val -> + num", |mut args| args.nth_val(1)),
+        GrammarRule("Val -> - num", negative_number_reducer),
         GrammarRule("num -> int", value_reducer),
         GrammarRule("num -> float", value_reducer),
         GrammarRule("Val -> ( A1 )", |mut args| args.nth_val(1)),
@@ -132,6 +164,8 @@ pub fn init_math_script_parser() -> Result<ScriptRunner<Value>, String> {
         TerminalSymbolDef(")", TokenType::RightParenthese),
         TerminalSymbolDef("*", TokenType::Multiply),
         TerminalSymbolDef("+", TokenType::Plus),
+        TerminalSymbolDef("-", TokenType::Minus),
+        TerminalSymbolDef("str", TokenType::String),
         TerminalSymbolDef("int", TokenType::Integer),
         TerminalSymbolDef("float", TokenType::Float),
         TerminalSymbolDef("EOF", TokenType::EOF),
