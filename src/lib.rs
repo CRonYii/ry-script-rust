@@ -14,10 +14,10 @@ use script::token::TokenType;
 impl Value {
     fn mul(self, rhs: Value) -> Result<Value, String> {
         match self {
-            Value::Integer(lhs) => {
-                let val = lhs * rhs.int()?;
-                Ok(Value::Integer(val))
-            }
+            Value::Integer(lhs) => match rhs {
+                Value::Integer(rhs) => Ok(Value::Integer(lhs * rhs)),
+                Value::Float(rhs) => Ok(Value::Float((lhs as f64) * rhs)),
+            },
             Value::Float(lhs) => {
                 let val = lhs * rhs.float()?;
                 Ok(Value::Float(val))
@@ -31,10 +31,10 @@ impl Value {
 
     fn add(self, rhs: Value) -> Result<Value, String> {
         match self {
-            Value::Integer(lhs) => {
-                let val = lhs + rhs.int()?;
-                Ok(Value::Integer(val))
-            }
+            Value::Integer(lhs) => match rhs {
+                Value::Integer(rhs) => Ok(Value::Integer(lhs + rhs)),
+                Value::Float(rhs) => Ok(Value::Float((lhs as f64) + rhs)),
+            },
             Value::Float(lhs) => {
                 let val = lhs + rhs.float()?;
                 Ok(Value::Float(val))
