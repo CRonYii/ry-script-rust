@@ -1,24 +1,24 @@
 use crate::script::grammar::GrammarSet;
 
-use super::ast::{ASTNode, ExpressionReducer};
+use super::ast::{ASTNode, ExpressionReducer, RuntimeValue};
 use super::grammar::{Symbol, TerminalSymbolDef};
 use super::lexer::Lexer;
 use super::lrparser::{LRParser, TransitionAction};
 use super::token::Tokens;
 
-pub struct ScriptRunner {
+pub struct ScriptRunner<T: RuntimeValue> {
     lexer: Lexer,
     lr_parser: LRParser,
-    reducer: Vec<ExpressionReducer>,
+    reducer: Vec<ExpressionReducer<T>>,
 }
 
-pub struct GrammarRule(pub &'static str, pub ExpressionReducer);
+pub struct GrammarRule<T: RuntimeValue>(pub &'static str, pub ExpressionReducer<T>);
 
-impl ScriptRunner {
+impl<T: RuntimeValue> ScriptRunner<T> {
     pub fn from(
-        grammars: Vec<GrammarRule>,
+        grammars: Vec<GrammarRule<T>>,
         terminal_symbols: &[TerminalSymbolDef],
-    ) -> Result<ScriptRunner, String> {
+    ) -> Result<ScriptRunner<T>, String> {
         let grammar_set = GrammarSet::from(&grammars, &terminal_symbols)?;
         let lr_parser = LRParser::lr0(grammar_set)?;
         #[cfg(feature = "debug_lrparser")]
@@ -30,7 +30,7 @@ impl ScriptRunner {
         })
     }
 
-    pub fn run(&mut self, input: &String) -> Result<ASTNode, String> {
+    pub fn run(&mut self, input: &String) -> Result<ASTNode<T>, String> {
         let tokens = self.lexer.parse(input)?;
         #[cfg(feature = "debug_lexer")]
         println!("{}", tokens);
@@ -38,10 +38,10 @@ impl ScriptRunner {
         Ok(execution_result)
     }
 
-    pub fn lr_parse(&self, tokens: Tokens) -> Result<ASTNode, String> {
+    pub fn lr_parse(&self, tokens: Tokens) -> Result<ASTNode<T>, String> {
         /* parse stack initial state 0 */
         let mut parse_stack = Vec::from([0]);
-        let mut ast_stack = Vec::<ASTNode>::new();
+        let mut ast_stack = Vec::<ASTNode<T>>::new();
         let mut iter = tokens.0.into_iter();
         let mut token = match iter.next() {
             Some(token) => token,
@@ -135,44 +135,44 @@ impl ScriptRunner {
     }
 }
 
-pub struct ReducerArg {
-    args: Vec<ASTNode>,
+pub struct ReducerArg<T: RuntimeValue> {
+    args: Vec<ASTNode<T>>,
 }
 
-impl ReducerArg {
-    fn from(args: Vec<ASTNode>) -> Self {
+impl<T: RuntimeValue> ReducerArg<T> {
+    fn from(args: Vec<ASTNode<T>>) -> Self {
         Self { args }
     }
 
-    pub fn eval(&mut self) -> Result<ASTNode, String> {
+    pub fn eval(&mut self) -> Result<ASTNode<T>, String> {
         self.args.pop().unwrap().evaluate()
     }
 
-    pub fn nth_eval(&mut self, n: usize) -> Result<ASTNode, String> {
+    pub fn nth_eval(&mut self, n: usize) -> Result<ASTNode<T>, String> {
         self.nth_node(n).evaluate()
     }
 
-    pub fn eval_skip(&mut self, n: usize) -> Result<ASTNode, String> {
+    pub fn eval_skip(&mut self, n: usize) -> Result<ASTNode<T>, String> {
         let node = self.eval();
         self.skip_n(n);
         node
     }
 
-    pub fn val(&mut self) -> ASTNode {
-        self.args.pop().unwrap().value()
+    pub fn val(&mut self) -> ASTNode<T> {
+        self.args.pop().unwrap()
     }
 
-    pub fn nth_val(&mut self, n: usize) -> ASTNode {
-        self.nth_node(n).value()
+    pub fn nth_val(&mut self, n: usize) -> ASTNode<T> {
+        self.nth_node(n)
     }
 
-    pub fn val_skip(&mut self, n: usize) -> ASTNode {
+    pub fn val_skip(&mut self, n: usize) -> ASTNode<T> {
         let node = self.val();
         self.skip_n(n);
         node
     }
 
-    fn nth_node(&mut self, n: usize) -> ASTNode {
+    fn nth_node(&mut self, n: usize) -> ASTNode<T> {
         for _ in 0..n {
             self.skip()
         }

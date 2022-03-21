@@ -6,10 +6,56 @@ mod math_tests;
 
 pub use math::matrix::Matrix;
 
-use script::ast::{never_reducer, value_reducer, ASTNode, Value};
+use script::ast::{never_reducer, value_reducer, ASTNode, RuntimeValue};
 use script::grammar::TerminalSymbolDef;
 use script::runner::{GrammarRule, ReducerArg, ScriptRunner};
-use script::token::TokenType;
+use script::token::{Token, TokenType};
+
+impl RuntimeValue for Value {}
+
+#[derive(Debug)]
+pub enum Value {
+    Integer(i64),
+    Float(f64),
+}
+
+impl std::convert::From<Token> for Value {
+    fn from(token: Token) -> Self {
+        match token.r#type {
+            TokenType::Integer => Value::Integer(token.value.parse().unwrap()),
+            TokenType::Float => Value::Float(token.value.parse().unwrap()),
+            _ => panic!("Parser Error: Unexpcted token {:?} cannot be converted to a value", token.r#type),
+        }
+    }
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Integer(num) => write!(f, "{}", num)?,
+            Value::Float(num) => write!(f, "{}", num)?,
+        }
+        Ok(())
+    }
+}
+
+impl Value {
+    pub fn int(self) -> Result<i64, String> {
+        match self {
+            Value::Integer(val) => Ok(val),
+            Value::Float(val) => Ok(val as i64),
+            // _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
+        }
+    }
+
+    pub fn float(self) -> Result<f64, String> {
+        match self {
+            Value::Integer(val) => Ok(val as f64),
+            Value::Float(val) => Ok(val),
+            // _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
+        }
+    }
+}
 
 impl Value {
     fn mul(self, rhs: Value) -> Result<Value, String> {
@@ -22,10 +68,6 @@ impl Value {
                 let val = lhs * rhs.float()?;
                 Ok(Value::Float(val))
             }
-            // _ => Err(format!(
-            //     "Runtime Error: {:?} does not support multiplication",
-            //     self
-            // )),
         }
     }
 
@@ -39,15 +81,11 @@ impl Value {
                 let val = lhs + rhs.float()?;
                 Ok(Value::Float(val))
             }
-            // _ => Err(format!(
-            //     "Runtime Error: {:?} does not support multiplication",
-            //     self
-            // )),
         }
     }
 }
 
-fn multiply_reducer(mut args: ReducerArg) -> ASTNode {
+fn multiply_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
     ASTNode::ActionExpression(
         "a * b",
         Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
@@ -61,7 +99,7 @@ fn multiply_reducer(mut args: ReducerArg) -> ASTNode {
     )
 }
 
-fn add_reducer(mut args: ReducerArg) -> ASTNode {
+fn add_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
     ASTNode::ActionExpression(
         "a + b",
         Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
@@ -75,8 +113,8 @@ fn add_reducer(mut args: ReducerArg) -> ASTNode {
     )
 }
 
-pub fn init_math_script_parser() -> Result<ScriptRunner, String> {
-    let grammars: Vec<GrammarRule> = vec![
+pub fn init_math_script_parser() -> Result<ScriptRunner<Value>, String> {
+    let grammars: Vec<GrammarRule<Value>> = vec![
         GrammarRule("B -> S EOF", never_reducer),
         GrammarRule("S -> A1", value_reducer),
         GrammarRule("A1 -> A2", value_reducer),

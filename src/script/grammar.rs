@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
-use super::{runner::GrammarRule, token::TokenType};
+use super::{runner::GrammarRule, token::TokenType, ast::RuntimeValue};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Symbol {
@@ -53,8 +53,8 @@ pub struct GrammarSet {
 
 impl GrammarSet {
     /* Pre-condition: The first grammar is expected to be the starter grammar */
-    pub fn from(
-        grammars: &Vec<GrammarRule>,
+    pub fn from<T: RuntimeValue>(
+        grammars: &Vec<GrammarRule<T>>,
         terminals: &[TerminalSymbolDef],
     ) -> Result<GrammarSet, String> {
         // terminal symbols

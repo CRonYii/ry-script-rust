@@ -6,73 +6,35 @@ use std::fmt::{Debug, Display};
 
 use super::{runner::ReducerArg, token::Token};
 
-pub type ExpressionReducer = fn(args: ReducerArg) -> ASTNode;
+pub type ExpressionReducer<T> = fn(args: ReducerArg<T>) -> ASTNode<T>;
 
-pub fn never_reducer(_: ReducerArg) -> ASTNode {
+pub fn never_reducer<T: RuntimeValue>(_: ReducerArg<T>) -> ASTNode<T> {
     panic!("Reach a reducer that should never be reached")
 }
 
-pub fn value_reducer(mut args: ReducerArg) -> ASTNode {
+pub fn value_reducer<T: RuntimeValue>(mut args: ReducerArg<T>) -> ASTNode<T> {
     args.val()
 }
 
-#[derive(Debug)]
-pub enum Value {
-    Integer(i64),
-    Float(f64),
-}
+pub trait RuntimeValue: Debug + Display + From<Token> {}
 
-impl Value {
-    pub fn int(self) -> Result<i64, String> {
-        match self {
-            Value::Integer(val) => Ok(val),
-            Value::Float(val) => Ok(val as i64),
-            // _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
-        }
-    }
-
-    pub fn float(self) -> Result<f64, String> {
-        match self {
-            Value::Integer(val) => Ok(val as f64),
-            Value::Float(val) => Ok(val),
-            // _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
-        }
-    }
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::Integer(num) => write!(f, "{}", num)?,
-            Value::Float(num) => write!(f, "{}", num)?,
-        }
-        Ok(())
-    }
-}
-
-pub enum ASTNode {
+pub enum ASTNode<T: RuntimeValue> {
     Token(Token),
-    ActionExpression(&'static str, Box<dyn FnMut() -> Result<ASTNode, String>>),
-    Value(Value),
+    ActionExpression(&'static str, Box<dyn FnMut() -> Result<ASTNode<T>, String>>),
+    Value(T),
 }
 
-impl ASTNode {
-    pub fn evaluate(self) -> Result<ASTNode, String> {
+impl<T: RuntimeValue> ASTNode<T> {
+    pub fn evaluate(self) -> Result<ASTNode<T>, String> {
         match self {
             ASTNode::ActionExpression(_, mut action) => action(),
+            ASTNode::Token(token) => Ok(ASTNode::Value(T::from(token))),
             _ => Ok(self),
         }
     }
-
-    pub fn value(self) -> ASTNode {
-        match self {
-            ASTNode::Token(token) => ASTNode::Value(token.value()),
-            _ => self,
-        }
-    }
 }
 
-impl Display for ASTNode {
+impl<T: RuntimeValue> Display for ASTNode<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,
@@ -83,7 +45,7 @@ impl Display for ASTNode {
     }
 }
 
-impl Debug for ASTNode {
+impl<T: RuntimeValue> Debug for ASTNode<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,

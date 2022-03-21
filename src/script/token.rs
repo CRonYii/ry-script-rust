@@ -2,8 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::vec::Vec;
 
-use super::ast::Value;
-
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum TokenType {
     Identifier,
@@ -47,16 +45,6 @@ pub enum TokenType {
 pub struct Token {
     pub r#type: TokenType,
     pub value: String,
-}
-
-impl Token {
-    pub fn value(self) -> Value {
-        match self.r#type {
-            TokenType::Integer => Value::Integer(self.value.parse().unwrap()),
-            TokenType::Float => Value::Float(self.value.parse().unwrap()),
-            _ => panic!("{:?} cannot be converted to a value", self.r#type),
-        }
-    }
 }
 
 impl TokenType {
