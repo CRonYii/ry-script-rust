@@ -6,6 +6,9 @@ use std::fmt::Display;
 
 use super::token::Token;
 
+pub type GrammarReducer = Vec<ExpressionReducer>;
+pub type ExpressionReducer = fn (args: Vec<ASTNode>) -> ASTNode;
+
 #[derive(Debug)]
 pub enum ASTNode {
     ValueNode(Token),
