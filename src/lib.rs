@@ -55,18 +55,27 @@ fn add_reducer(mut args: ReducerArg) -> ASTNode {
     )
 }
 
+fn parenthesis_reducer(mut args: ReducerArg) -> ASTNode {
+    args.skip();
+    args.val()
+}
+
 pub fn init_math_script_parser() -> Result<ScriptRunner, String> {
     let grammars: Vec<GrammarRule> = vec![
         GrammarRule("B -> S EOF", never_reducer),
         GrammarRule("S -> A1", value_reducer),
         GrammarRule("A1 -> A2", value_reducer),
-        GrammarRule("A1 -> A1 * A2", multiply_reducer),
+        GrammarRule("A1 -> A1 + A2", add_reducer),
         GrammarRule("A2 -> A3", value_reducer),
-        GrammarRule("A2 -> A2 + A3", add_reducer),
-        GrammarRule("A3 -> int", value_reducer),
-        GrammarRule("A3 -> float", value_reducer),
+        GrammarRule("A2 -> A2 * A3", multiply_reducer),
+        GrammarRule("A3 -> Val", value_reducer),
+        GrammarRule("Val -> int", value_reducer),
+        GrammarRule("Val -> float", value_reducer),
+        GrammarRule("Val -> ( A1 )", parenthesis_reducer),
     ];
     let terminal_symbols = [
+        TerminalSymbolDef("(", TokenType::LeftParenthese),
+        TerminalSymbolDef(")", TokenType::RightParenthese),
         TerminalSymbolDef("*", TokenType::Multiply),
         TerminalSymbolDef("+", TokenType::Plus),
         TerminalSymbolDef("int", TokenType::Integer),
