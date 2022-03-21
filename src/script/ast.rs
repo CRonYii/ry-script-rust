@@ -40,6 +40,16 @@ impl Value {
     }
 }
 
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Integer(num) => write!(f, "{}", num)?,
+            Value::Float(num) => write!(f, "{}", num)?,
+        }
+        Ok(())
+    }
+}
+
 pub enum ASTNode {
     Token(Token),
     ActionExpression(&'static str, Box<dyn FnMut() -> Result<ASTNode, String>>),
@@ -67,9 +77,7 @@ impl Display for ASTNode {
         match self {
             ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,
             ASTNode::ActionExpression(name, _) => write!(f, "{:?}", name)?,
-            ASTNode::Value(val) => write!(f, "{:?}", val)?,
-            // ASTNode::Integer(num) => write!(f, "{}", num)?,
-            // ASTNode::Float(num) => write!(f, "{}", num)?,
+            ASTNode::Value(val) => write!(f, "{}", val)?,
         }
         Ok(())
     }
@@ -81,8 +89,6 @@ impl Debug for ASTNode {
             ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,
             ASTNode::ActionExpression(name, _) => write!(f, "{:?}", name)?,
             ASTNode::Value(val) => write!(f, "{:?}", val)?,
-            // ASTNode::Integer(num) => write!(f, "int({})", num)?,
-            // ASTNode::Float(num) => write!(f, "float({})", num)?,
         }
         Ok(())
     }
