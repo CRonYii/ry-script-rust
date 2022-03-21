@@ -4,7 +4,7 @@ use ry_mathr::init_math_script_parser;
 
 fn main() {
     use std::io::Write;
-    let mut lr_parser = match init_math_script_parser() {
+    let mut script_runner = match init_math_script_parser() {
         Ok(lr_parser) => lr_parser,
         Err(err) => {
             eprintln!("Failed during initialization: {}", err);
@@ -22,7 +22,7 @@ fn main() {
         if line.starts_with(".exit") {
             break;
         }
-        match lr_parser.parse(&line) {
+        match script_runner.run(&line) {
             Ok(node) => println!("> {}", node),
             Err(err) => eprintln!("{}", err),
         }

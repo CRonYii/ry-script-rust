@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
-use super::token::TokenType;
+use super::{runner::GrammarRule, token::TokenType};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Symbol {
@@ -54,7 +54,7 @@ pub struct GrammarSet {
 impl GrammarSet {
     /* Pre-condition: The first grammar is expected to be the starter grammar */
     pub fn from(
-        grammars_text: &[&'static str],
+        grammars: &Vec<GrammarRule>,
         terminals: &[TerminalSymbolDef],
     ) -> Result<GrammarSet, String> {
         // terminal symbols
@@ -65,8 +65,8 @@ impl GrammarSet {
         });
         // non-terminal symbols
         let mut non_terminal_symbols = HashMap::new();
-        for text in grammars_text {
-            let mut tokens = text.split(" ");
+        for text in grammars {
+            let mut tokens = text.0.split(" ");
             let lval = match tokens.next() {
                 Some(token) => token,
                 None => return Err(format!("Grammar has no lval")),
@@ -78,8 +78,8 @@ impl GrammarSet {
             terminal_symbols,
             non_terminal_symbols,
         };
-        for text in grammars_text {
-            grammar.parse_grammar(text)?;
+        for text in grammars {
+            grammar.parse_grammar(text.0)?;
         }
         Ok(grammar)
     }
