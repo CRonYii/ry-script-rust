@@ -34,7 +34,8 @@ impl ScriptRunner {
         let tokens = self.lexer.parse(input)?;
         #[cfg(feature = "debug_lexer")]
         println!("{}", tokens);
-        Ok(self.lr_parse(tokens)?)
+        let execution_result = self.lr_parse(tokens)?.evaluate()?;
+        Ok(execution_result)
     }
 
     pub fn lr_parse(&self, tokens: Tokens) -> Result<ASTNode, String> {
@@ -83,8 +84,9 @@ impl ScriptRunner {
                     }
                     /* Pop rvals.len() items */
                     let remains = ast_stack.len() - grammar.rvals.len();
-                    let params = ast_stack.drain(remains..).collect::<Vec<_>>();
-                    let ast_node = self.reducer[rule_idx](params);
+                    let params = ast_stack.drain(remains..).rev().collect();
+                    let args = ReducerArg::from(params);
+                    let ast_node = self.reducer[rule_idx](args);
                     #[cfg(feature = "debug_lrparser")]
                     println!("Reduce [{}. {}] -> {}", rule_number, grammar, ast_node);
                     ast_stack.push(ast_node);
@@ -125,5 +127,23 @@ impl ScriptRunner {
             }
         }
         Err(format!("Parse Error: Incorrect syntax"))
+    }
+}
+
+pub struct ReducerArg {
+    args: Vec<ASTNode>,
+}
+
+impl ReducerArg {
+    fn from(args: Vec<ASTNode>) -> Self {
+        Self { args }
+    }
+
+    pub fn eval(&mut self) -> Result<ASTNode, String> {
+        self.args.pop().unwrap().evaluate()
+    }
+
+    pub fn skip(&mut self) {
+        self.args.pop();
     }
 }

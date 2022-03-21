@@ -53,6 +53,7 @@ impl Token {
     pub fn value(self) -> ASTNode {
         match self.r#type {
             TokenType::Integer => ASTNode::Integer(self.value.parse().unwrap()),
+            TokenType::Float => ASTNode::Float(self.value.parse().unwrap()),
             _ => panic!("{:?} cannot be converted to a value", self.r#type),
         }
     }
