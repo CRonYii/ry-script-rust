@@ -171,7 +171,7 @@ impl LRParser {
                     None => (/* do nothing */),
                 }
             }
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debug_lrparser")]
             println!("Parsed Itemset {}: {}\n", transition_table.len(), item_set);
             // add new itemsets to vector
             new_itemsets.into_iter().for_each(|(symbol, itemset)| {

@@ -37,7 +37,7 @@ impl ScriptParser {
 
     pub fn parse(&mut self, input: &String) -> Result<ASTNode, String> {
         let tokens = self.lexer.parse(input)?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debug_lexer")]
         println!("{}", tokens);
         Ok(self.lr_parse(tokens)?)
     }
@@ -59,7 +59,7 @@ impl ScriptParser {
             let action = self
                 .lr_parser
                 .get_action(state, &Symbol::Terminal(token.r#type))?;
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debug_lrparser")]
             println!("{:?} -> [{}] {}", token.r#type, state, action);
             match action {
                 TransitionAction::Shift(state) => {
@@ -90,7 +90,7 @@ impl ScriptParser {
                     let remains = ast_stack.len() - grammar.rvals.len();
                     let params = ast_stack.drain(remains..).collect::<Vec<_>>();
                     let ast_node = self.reducer[rule_idx - 1](params);
-                    #[cfg(debug_assertions)]
+                    #[cfg(feature = "debug_lrparser")]
                     println!("Reduce [{}. {}] -> {}", rule_number, grammar, ast_node);
                     ast_stack.push(ast_node);
                     let remains = parse_stack.len() - grammar.rvals.len();
@@ -183,7 +183,7 @@ pub fn init_math_script_parser() -> Result<ScriptParser, String> {
     ];
     let grammar_set = GrammarSet::from(&grammars, &terminal_symbols)?;
     let lr_parser = LRParser::lr0(grammar_set)?;
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debug_lrparser")]
     println!("{}", lr_parser);
     Ok(ScriptParser::from(lr_parser, reducer)?)
 }

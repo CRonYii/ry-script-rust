@@ -90,7 +90,7 @@ impl GrammarSet {
         } else if let Some(non_terminal_symbol) = self.non_terminal_symbols.get(symbol) {
             Some(Rc::clone(non_terminal_symbol))
         } else {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debug_grammar")]
             println!("cannot find symbol {}", symbol);
             None
         }
@@ -129,7 +129,7 @@ impl GrammarSet {
             lval,
             rvals,
         });
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debug_grammar")]
         println!("Parsed grammar: {}", grammar);
         self.grammars.push(grammar);
         Ok(())

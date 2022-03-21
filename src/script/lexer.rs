@@ -278,7 +278,7 @@ impl Lexer {
     }
 
     fn parse_char(&mut self, ch: char) -> bool {
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debug_lexer")]
         println!("{:?} -> {:?}", self.state, ch);
         let res = match self.state {
             LexerState::Normal => self.handle_normal_state(ch),
