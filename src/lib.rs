@@ -6,7 +6,7 @@ mod math_tests;
 
 pub use math::matrix::Matrix;
 
-use script::ast::{never_reducer, value_reducer, ASTNode};
+use script::ast::{never_reducer, value_reducer, ASTNode, Value};
 use script::grammar::TerminalSymbolDef;
 use script::runner::{GrammarRule, ReducerArg, ScriptRunner};
 use script::token::TokenType;
@@ -14,24 +14,26 @@ use script::token::TokenType;
 fn multiply_reducer(mut args: ReducerArg) -> ASTNode {
     ASTNode::ActionExpression(
         "a * b",
-        Box::new(move || {
-            let (lhs, rhs) = (args.eval_skip(1)?, args.eval()?);
-            #[cfg(feature = "debug_ast")]
-            println!("eval {:?} * {:?}", lhs, rhs);
-            match lhs {
-                ASTNode::Integer(lhs) => {
-                    let val = lhs * rhs.int()?;
-                    Ok(ASTNode::Integer(val))
+        Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
+            (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
+                #[cfg(feature = "debug_ast")]
+                println!("eval {:?} * {:?}", lhs, rhs);
+                match lhs {
+                    Value::Integer(lhs) => {
+                        let val = lhs * rhs.int()?;
+                        Ok(ASTNode::Value(Value::Integer(val)))
+                    }
+                    Value::Float(lhs) => {
+                        let val = lhs * rhs.float()?;
+                        Ok(ASTNode::Value(Value::Float(val)))
+                    }
+                    // _ => Err(format!(
+                    //     "Runtime Error: {:?} does not support multiplication",
+                    //     lhs
+                    // )),
                 }
-                ASTNode::Float(lhs) => {
-                    let val = lhs * rhs.float()?;
-                    Ok(ASTNode::Float(val))
-                }
-                _ => Err(format!(
-                    "Runtime Error: {:?} does not support multiplication",
-                    lhs
-                )),
             }
+            _ => panic!("Parse Error: Reducer expected value but non-value were given"),
         }),
     )
 }
@@ -39,24 +41,23 @@ fn multiply_reducer(mut args: ReducerArg) -> ASTNode {
 fn add_reducer(mut args: ReducerArg) -> ASTNode {
     ASTNode::ActionExpression(
         "a + b",
-        Box::new(move || {
-            let (lhs, rhs) = (args.eval_skip(1)?, args.eval()?);
-            #[cfg(feature = "debug_ast")]
-            println!("eval {:?} + {:?}", lhs, rhs);
-            match lhs {
-                ASTNode::Integer(lhs) => {
-                    let val = lhs + rhs.int()?;
-                    Ok(ASTNode::Integer(val))
+        Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
+            (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
+                #[cfg(feature = "debug_ast")]
+                println!("eval {:?} + {:?}", lhs, rhs);
+                match lhs {
+                    Value::Integer(lhs) => {
+                        let val = lhs + rhs.int()?;
+                        Ok(ASTNode::Value(Value::Integer(val)))
+                    }
+                    Value::Float(lhs) => {
+                        let val = lhs + rhs.float()?;
+                        Ok(ASTNode::Value(Value::Float(val)))
+                    }
+                    // _ => Err(format!("Runtime Error: {:?} does not support adding", lhs)),
                 }
-                ASTNode::Float(lhs) => {
-                    let val = lhs + rhs.float()?;
-                    Ok(ASTNode::Float(val))
-                }
-                _ => Err(format!(
-                    "Runtime Error: {:?} does not support addition",
-                    lhs
-                )),
             }
+            _ => panic!("Parse Error: Reducer expected value but non-value were given"),
         }),
     )
 }

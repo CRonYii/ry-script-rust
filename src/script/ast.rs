@@ -16,11 +16,34 @@ pub fn value_reducer(mut args: ReducerArg) -> ASTNode {
     args.val()
 }
 
+#[derive(Debug)]
+pub enum Value {
+    Integer(i64),
+    Float(f64),
+}
+
+impl Value {
+    pub fn int(self) -> Result<i64, String> {
+        match self {
+            Value::Integer(val) => Ok(val),
+            Value::Float(val) => Ok(val as i64),
+            // _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
+        }
+    }
+
+    pub fn float(self) -> Result<f64, String> {
+        match self {
+            Value::Integer(val) => Ok(val as f64),
+            Value::Float(val) => Ok(val),
+            // _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
+        }
+    }
+}
+
 pub enum ASTNode {
     Token(Token),
     ActionExpression(&'static str, Box<dyn FnMut() -> Result<ASTNode, String>>),
-    Integer(i64),
-    Float(f64),
+    Value(Value),
 }
 
 impl ASTNode {
@@ -30,27 +53,11 @@ impl ASTNode {
             _ => Ok(self),
         }
     }
-    
+
     pub fn value(self) -> ASTNode {
         match self {
-            ASTNode::Token(token) => token.value(),
+            ASTNode::Token(token) => ASTNode::Value(token.value()),
             _ => self,
-        }
-    }
-
-    pub fn int(self) -> Result<i64, String> {
-        match self {
-            ASTNode::Integer(val) => Ok(val),
-            ASTNode::Float(val) => Ok(val as i64),
-            _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
-        }
-    }
-
-    pub fn float(self) -> Result<f64, String> {
-        match self {
-            ASTNode::Integer(val) => Ok(val as f64),
-            ASTNode::Float(val) => Ok(val),
-            _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
         }
     }
 }
@@ -60,8 +67,9 @@ impl Display for ASTNode {
         match self {
             ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,
             ASTNode::ActionExpression(name, _) => write!(f, "{:?}", name)?,
-            ASTNode::Integer(num) => write!(f, "{}", num)?,
-            ASTNode::Float(num) => write!(f, "{}", num)?,
+            ASTNode::Value(val) => write!(f, "{:?}", val)?,
+            // ASTNode::Integer(num) => write!(f, "{}", num)?,
+            // ASTNode::Float(num) => write!(f, "{}", num)?,
         }
         Ok(())
     }
@@ -72,8 +80,9 @@ impl Debug for ASTNode {
         match self {
             ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,
             ASTNode::ActionExpression(name, _) => write!(f, "{:?}", name)?,
-            ASTNode::Integer(num) => write!(f, "int({})", num)?,
-            ASTNode::Float(num) => write!(f, "float({})", num)?,
+            ASTNode::Value(val) => write!(f, "{:?}", val)?,
+            // ASTNode::Integer(num) => write!(f, "int({})", num)?,
+            // ASTNode::Float(num) => write!(f, "float({})", num)?,
         }
         Ok(())
     }
