@@ -56,11 +56,13 @@ impl ScriptRunner {
                 .lr_parser
                 .get_action(state, &Symbol::Terminal(token.r#type))?;
             #[cfg(feature = "debug_lrparser")]
-            println!("{:?} -> [{}] {}", token.r#type, state, action);
+            println!("{:?} -> [{}] {}\n  AST stack{:?}", token.r#type, state, action, ast_stack);
             match action {
                 TransitionAction::Shift(state) => {
                     parse_stack.push(*state);
                     /* push AST stack */
+                    #[cfg(feature = "debug_lrparser")]
+                    println!("  Shift [{:?}] -> {}", token, state);
                     ast_stack.push(ASTNode::Token(token));
                     token = match iter.next() {
                         Some(token) => token,
@@ -88,7 +90,7 @@ impl ScriptRunner {
                     let args = ReducerArg::from(params);
                     let ast_node = self.reducer[rule_idx](args);
                     #[cfg(feature = "debug_lrparser")]
-                    println!("Reduce [{}. {}] -> {}", rule_number, grammar, ast_node);
+                    println!("  Reduce [{}. {}] -> {}", rule_number, grammar, ast_node);
                     ast_stack.push(ast_node);
                     let remains = parse_stack.len() - grammar.rvals.len();
                     parse_stack.truncate(remains);

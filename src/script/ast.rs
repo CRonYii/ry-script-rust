@@ -2,7 +2,7 @@
 Abstract Syntax Tree
 */
 
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use super::{runner::ReducerArg, token::Token};
 
@@ -36,7 +36,7 @@ impl ASTNode {
         match self {
             ASTNode::Integer(val) => Ok(val),
             ASTNode::Float(val) => Ok(val as i64),
-            _ => Err(format!("Runtime Error: Cannot cast {} to int", self)),
+            _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
         }
     }
 
@@ -44,12 +44,24 @@ impl ASTNode {
         match self {
             ASTNode::Integer(val) => Ok(val as f64),
             ASTNode::Float(val) => Ok(val),
-            _ => Err(format!("Runtime Error: Cannot cast {} to int", self)),
+            _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
         }
     }
 }
 
 impl Display for ASTNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,
+            ASTNode::ActionExpression(name, _) => write!(f, "{:?}", name)?,
+            ASTNode::Integer(num) => write!(f, "{}", num)?,
+            ASTNode::Float(num) => write!(f, "{}", num)?,
+        }
+        Ok(())
+    }
+}
+
+impl Debug for ASTNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,

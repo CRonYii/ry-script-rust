@@ -17,7 +17,7 @@ pub fn multiply_reducer(mut args: ReducerArg) -> ASTNode {
         Box::new(move || {
             let (lhs, _, rhs) = (args.eval()?, args.skip(), args.eval()?);
             #[cfg(feature = "debug_ast")]
-            println!("eval {} * {}", lhs, rhs);
+            println!("eval {:?} * {:?}", lhs, rhs);
             match lhs {
                 ASTNode::Integer(lhs) => {
                     let val = lhs * rhs.int()?;
@@ -27,7 +27,7 @@ pub fn multiply_reducer(mut args: ReducerArg) -> ASTNode {
                     let val = lhs * rhs.float()?;
                     Ok(ASTNode::Float(val))
                 },
-                _ => Err(format!("Runtime Error: {} does not support multiplication", lhs))
+                _ => Err(format!("Runtime Error: {:?} does not support multiplication", lhs))
             }
         }),
     )
