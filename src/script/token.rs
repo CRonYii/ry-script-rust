@@ -60,10 +60,10 @@ impl Token {
 }
 
 impl TokenType {
-    pub fn entity(self, value: &String) -> Token {
+    pub fn entity(self, value: String) -> Token {
         Token {
             r#type: self,
-            value: value.clone(),
+            value,
         }
     }
 }

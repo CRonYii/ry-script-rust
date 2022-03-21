@@ -1,5 +1,4 @@
 use super::token::{Token, TokenMap, TokenType, Tokens};
-use std::mem::take;
 
 #[derive(Debug, PartialEq, Eq)]
 enum LexerState {
@@ -272,8 +271,8 @@ impl Lexer {
             move_cursor = self.parse_char(next_char);
         }
         match self.state {
-            LexerState::End => Ok(Tokens(take(&mut self.tokens))),
-            _ => Err(take(&mut self.error)),
+            LexerState::End => Ok(Tokens(std::mem::take(&mut self.tokens))),
+            _ => Err(std::mem::take(&mut self.error)),
         }
     }
 
@@ -297,7 +296,7 @@ impl Lexer {
         }
         match res.create {
             Some(token) => {
-                self.tokens.push(token.entity(&self.buffer));
+                self.tokens.push(token.entity(std::mem::take(&mut self.buffer)));
                 self.buffer.clear();
             }
             None => (),
