@@ -32,25 +32,24 @@ impl std::fmt::Display for GrammarError {
 
 pub enum LexerError {
     Error(&'static str),
-    UnexpectedToken,
+    UnexpectedToken(char),
 }
 
 impl std::fmt::Display for LexerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LexerError::Error(_) => todo!(),
-            LexerError::UnexpectedToken => todo!(),
+            LexerError::Error(msg) => write!(f, "{}", msg),
+            LexerError::UnexpectedToken(ch) => write!(f, "Unexpected token {}", ch),
         }
     }
 }
 
-// TODO: fix Lexer Error
-impl<E> From<String> for ScriptError<E>
+impl<E> From<LexerError> for ScriptError<E>
 where
     E: RuntimeError,
 {
-    fn from(_: String) -> Self {
-        todo!()
+    fn from(error: LexerError) -> Self {
+        ScriptError::Lexer(error)
     }
 }
 
