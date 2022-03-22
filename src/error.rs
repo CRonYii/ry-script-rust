@@ -14,6 +14,30 @@ impl<E> From<E> for ScriptError<E> {
     }
 }
 
+impl<E: RuntimeError> std::fmt::Display for ScriptError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScriptError::Grammar(error) => write!(f, "GrammarError: {}", error),
+            ScriptError::Lexer(error) => write!(f, "LexerError: {}", error),
+            ScriptError::Parse(error) => write!(f, "ParseError: {}", error),
+            ScriptError::Syntax(error) => write!(f, "{:?}", error),
+            ScriptError::Runtime(error) => write!(f, "RuntimeError: {}", error),
+        }
+    }
+}
+
+impl<E: RuntimeError> std::fmt::Debug for ScriptError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScriptError::Grammar(error) => write!(f, "GrammarError: {}", error),
+            ScriptError::Lexer(error) => write!(f, "LexerError: {}", error),
+            ScriptError::Parse(error) => write!(f, "ParseError: {}", error),
+            ScriptError::Syntax(error) => write!(f, "{:?}", error),
+            ScriptError::Runtime(error) => write!(f, "RuntimeError: {}", error),
+        }
+    }
+}
+
 pub enum GrammarError {
     Error(&'static str),
     InvalidGrammarText(&'static str),
@@ -74,18 +98,6 @@ impl std::fmt::Display for ParseError {
 #[derive(Debug)]
 pub enum SyntaxError {
     SyntaxError
-}
-
-impl<E: RuntimeError> std::fmt::Display for ScriptError<E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ScriptError::Grammar(error) => write!(f, "GrammarError: {}", error),
-            ScriptError::Lexer(error) => write!(f, "LexerError: {}", error),
-            ScriptError::Parse(error) => write!(f, "ParseError: {}", error),
-            ScriptError::Syntax(error) => write!(f, "{:?}", error),
-            ScriptError::Runtime(error) => write!(f, "RuntimeError: {}", error),
-        }
-    }
 }
 
 impl<E> From<GrammarError> for ScriptError<E>

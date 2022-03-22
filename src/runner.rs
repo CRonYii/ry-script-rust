@@ -1,9 +1,6 @@
-use crate::script::error::ParseError;
-use crate::script::grammar::GrammarSet;
-
 use super::ast::{ASTNode, ExpressionReducer, RuntimeValue};
-use super::error::{RuntimeError, SyntaxError};
-use super::grammar::{Symbol, TerminalSymbolDef};
+use super::error::{RuntimeError, SyntaxError, ParseError};
+use super::grammar::{Symbol, TerminalSymbolDef, GrammarSet};
 use super::lexer::Lexer;
 use super::lrparser::{LRParser, TransitionAction};
 use super::token::{LexerTokenMap, ParserToken, SpecialTokenMap, Tokens};
@@ -59,7 +56,7 @@ impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<T, R, 
         Ok(execution_result)
     }
 
-    pub fn lr_parse(&self, tokens: Tokens<T>) -> super::error::Result<ASTNode<T, R, E>, E> {
+    fn lr_parse(&self, tokens: Tokens<T>) -> super::error::Result<ASTNode<T, R, E>, E> {
         /* parse stack initial state 0 */
         let mut parse_stack = Vec::from([0]);
         let mut ast_stack = Vec::<ASTNode<T, R, E>>::new();

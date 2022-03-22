@@ -1,5 +1,5 @@
 [package]
-name = "ry-mathr"
+name = "ry-script"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,6 +10,3 @@ debug_ast = []
 debug_lrparser = []
 debug_grammar = []
 debug_lexer = []
-
-[dependencies]
-ndarray = "0.15.3"
