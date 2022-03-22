@@ -17,7 +17,7 @@ pub struct GrammarRule<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError>(
 );
 
 impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<T, R, E> {
-    pub fn from(
+    pub fn new(
         grammars: Vec<GrammarRule<T, R, E>>,
         token_map: LexerTokenMap<T>,
         operator: &[TerminalSymbolDef<T>],
@@ -36,7 +36,7 @@ impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<T, R, 
         for &symbol in keyword {
             terminal_symbols.push(symbol);
         }
-        let grammar_set = GrammarSet::from(&grammars, &terminal_symbols, token_map.eof)?;
+        let grammar_set = GrammarSet::new(&grammars, &terminal_symbols, token_map.eof)?;
         let lr_parser = LRParser::lr0(grammar_set)?;
         #[cfg(feature = "debug_lrparser")]
         println!("{}", lr_parser);
@@ -48,7 +48,7 @@ impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<T, R, 
         })
     }
 
-    pub fn run(&mut self, input: &String) -> super::error::Result<ASTNode<T, R, E>, E> {
+    pub fn run(&mut self, input: &str) -> super::error::Result<ASTNode<T, R, E>, E> {
         let tokens = self.lexer.parse(input)?;
         #[cfg(feature = "debug_lexer")]
         println!("{}", tokens);
@@ -103,7 +103,7 @@ impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<T, R, 
                     /* Pop rvals.len() items */
                     let remains = ast_stack.len() - grammar.rvals.len();
                     let params = ast_stack.drain(remains..).rev().collect();
-                    let args = ReducerArg::from(params);
+                    let args = ReducerArg::new(params);
                     let ast_node = self.reducer[rule_idx](args);
                     #[cfg(feature = "debug_lrparser")]
                     println!("  Reduce [{}. {}] -> {}", rule_number, grammar, ast_node);
@@ -149,7 +149,7 @@ pub struct ReducerArg<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> {
 }
 
 impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ReducerArg<T, R, E> {
-    fn from(args: Vec<ASTNode<T, R, E>>) -> Self {
+    fn new(args: Vec<ASTNode<T, R, E>>) -> Self {
         Self { args }
     }
 

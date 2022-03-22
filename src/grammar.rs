@@ -57,7 +57,7 @@ pub struct GrammarSet<T: ParserToken<T>> {
 
 impl<T: ParserToken<T>> GrammarSet<T> {
     /* Pre-condition: The first grammar is expected to be the starter grammar */
-    pub fn from<R: RuntimeValue<T>, E: RuntimeError>(
+    pub fn new<R: RuntimeValue<T>, E: RuntimeError>(
         grammars: &Vec<GrammarRule<T, R, E>>,
         terminals: &Vec<TerminalSymbolDef<T>>,
         eof: T,

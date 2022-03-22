@@ -198,7 +198,10 @@ mod simple_script_tests {
         )
     }
 
-    fn init_simple_script_parser() -> ry_script::error::Result<ScriptRunner<TokenType, Value, ScriptRuntimeError>, ScriptRuntimeError> {
+    fn init_simple_script_parser() -> ry_script::error::Result<
+        ScriptRunner<TokenType, Value, ScriptRuntimeError>,
+        ScriptRuntimeError,
+    > {
         /* These construct the Lexer */
         let token_map = LexerTokenMap {
             eof: TokenType::EOF,
@@ -240,7 +243,7 @@ mod simple_script_tests {
             GrammarRule("num -> false", value_reducer),
             GrammarRule("Val -> ( A1 )", |mut args| args.nth_val(1)),
         ];
-        ScriptRunner::from(grammars, token_map, &operator, &keyword)
+        ScriptRunner::new(grammars, token_map, &operator, &keyword)
     }
 
     #[test]
