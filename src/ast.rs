@@ -8,42 +8,45 @@ use super::error::RuntimeError;
 use super::runner::ReducerArg;
 use super::token::{ParserToken, Token};
 
-pub type ExpressionReducer<T, R, E> = fn(args: ReducerArg<T, R, E>) -> ASTNode<T, R, E>;
+pub type ExpressionReducer<ENV, T, R, E> =
+    fn(args: ReducerArg<ENV, T, R, E>) -> ASTNode<ENV, T, R, E>;
 
-pub fn never_reducer<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError>(
-    _: ReducerArg<T, R, E>,
-) -> ASTNode<T, R, E> {
+pub fn never_reducer<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError>(
+    _: ReducerArg<ENV, T, R, E>,
+) -> ASTNode<ENV, T, R, E> {
     panic!("Reach a reducer that should never be reached")
 }
 
-pub fn value_reducer<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError>(
-    mut args: ReducerArg<T, R, E>,
-) -> ASTNode<T, R, E> {
+pub fn value_reducer<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError>(
+    mut args: ReducerArg<ENV, T, R, E>,
+) -> ASTNode<ENV, T, R, E> {
     args.val()
 }
 
 pub trait RuntimeValue<T: ParserToken<T>>: Debug + Display + From<Token<T>> {}
 
-pub enum ASTNode<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> {
+pub enum ASTNode<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> {
     Token(Token<T>),
     ActionExpression(
         &'static str,
-        Box<dyn FnMut() -> Result<ASTNode<T, R, E>, E>>,
+        Box<dyn FnMut(&ENV) -> Result<ASTNode<ENV, T, R, E>, E>>,
     ),
     Value(R),
 }
 
-impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ASTNode<T, R, E> {
-    pub fn evaluate(self) -> Result<ASTNode<T, R, E>, E> {
+impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ASTNode<ENV, T, R, E> {
+    pub fn evaluate(self, env: &ENV) -> Result<ASTNode<ENV, T, R, E>, E> {
         match self {
-            ASTNode::ActionExpression(_, mut action) => action(),
+            ASTNode::ActionExpression(_, mut action) => action(env),
             ASTNode::Token(token) => Ok(ASTNode::Value(R::from(token))),
             _ => Ok(self),
         }
     }
 }
 
-impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> Display for ASTNode<T, R, E> {
+impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> Display
+    for ASTNode<ENV, T, R, E>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,
@@ -54,7 +57,7 @@ impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> Display for ASTNode
     }
 }
 
-impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> Debug for ASTNode<T, R, E> {
+impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> Debug for ASTNode<ENV, T, R, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ASTNode::Token(token) => write!(f, "{:?}", token.r#type)?,

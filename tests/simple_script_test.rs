@@ -58,6 +58,8 @@ mod simple_script_tests {
     }
 
     /* Defines runtime */
+    struct RuntimeEnvironment {}
+
     impl RuntimeValue<TokenType> for Value {}
 
     #[derive(Debug, PartialEq)]
@@ -151,43 +153,47 @@ mod simple_script_tests {
 
     /* Grammar reducers that takes advantage of RuntimeValue */
     fn multiply_reducer(
-        mut args: ReducerArg<TokenType, Value, ScriptRuntimeError>,
-    ) -> ASTNode<TokenType, Value, ScriptRuntimeError> {
+        mut args: ReducerArg<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError>,
+    ) -> ASTNode<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError> {
         ASTNode::ActionExpression(
             "a * b",
-            Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
-                (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
-                    #[cfg(feature = "debug_ast")]
-                    println!("eval {:?} * {:?}", lhs, rhs);
-                    Ok(ASTNode::Value(lhs.mul(rhs)?))
-                }
-                _ => panic!("Parse Error: Reducer expected value but non-value were given"),
-            }),
+            Box::new(
+                move |env| match (args.eval_skip(env, 1)?, args.eval(env)?) {
+                    (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
+                        #[cfg(feature = "debug_ast")]
+                        println!("eval {:?} * {:?}", lhs, rhs);
+                        Ok(ASTNode::Value(lhs.mul(rhs)?))
+                    }
+                    _ => panic!("Parse Error: Reducer expected value but non-value were given"),
+                },
+            ),
         )
     }
 
     fn add_reducer(
-        mut args: ReducerArg<TokenType, Value, ScriptRuntimeError>,
-    ) -> ASTNode<TokenType, Value, ScriptRuntimeError> {
+        mut args: ReducerArg<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError>,
+    ) -> ASTNode<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError> {
         ASTNode::ActionExpression(
             "a + b",
-            Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
-                (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
-                    #[cfg(feature = "debug_ast")]
-                    println!("eval {:?} + {:?}", lhs, rhs);
-                    Ok(ASTNode::Value(lhs.add(rhs)?))
-                }
-                _ => panic!("Parse Error: Reducer expected value but non-value were given"),
-            }),
+            Box::new(
+                move |env| match (args.eval_skip(env, 1)?, args.eval(env)?) {
+                    (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
+                        #[cfg(feature = "debug_ast")]
+                        println!("eval {:?} + {:?}", lhs, rhs);
+                        Ok(ASTNode::Value(lhs.add(rhs)?))
+                    }
+                    _ => panic!("Parse Error: Reducer expected value but non-value were given"),
+                },
+            ),
         )
     }
 
     fn negative_number_reducer(
-        mut args: ReducerArg<TokenType, Value, ScriptRuntimeError>,
-    ) -> ASTNode<TokenType, Value, ScriptRuntimeError> {
+        mut args: ReducerArg<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError>,
+    ) -> ASTNode<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError> {
         ASTNode::ActionExpression(
             "a + b",
-            Box::new(move || match args.nth_eval(1)? {
+            Box::new(move |env| match args.nth_eval(env, 1)? {
                 ASTNode::Value(val) => {
                     #[cfg(feature = "debug_ast")]
                     println!("eval - {:?}", val);
@@ -199,7 +205,7 @@ mod simple_script_tests {
     }
 
     fn init_simple_script_parser() -> ry_script::error::Result<
-        ScriptRunner<TokenType, Value, ScriptRuntimeError>,
+        ScriptRunner<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError>,
         ScriptRuntimeError,
     > {
         /* These construct the Lexer */
@@ -225,7 +231,7 @@ mod simple_script_tests {
         ];
 
         /* These construct the LR Parser */
-        let grammars: Vec<GrammarRule<TokenType, Value, ScriptRuntimeError>> = vec![
+        let grammars: Vec<GrammarRule<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError>> = vec![
             GrammarRule("B -> S EOF", never_reducer),
             GrammarRule("S -> A1", value_reducer),
             GrammarRule("A1 -> A2", value_reducer),
@@ -249,19 +255,20 @@ mod simple_script_tests {
     #[test]
     fn test_addition() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
-        match runner.run(&"1+1")? {
+        let env = RuntimeEnvironment {};
+        match runner.run(&env, &"1+1")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(2)),
             _ => panic!(),
         };
-        match runner.run(&"1+2.5")? {
+        match runner.run(&env, &"1+2.5")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Float(3.5)),
             _ => panic!(),
         };
-        match runner.run(&"1.5+40")? {
+        match runner.run(&env, &"1.5+40")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Float(41.5)),
             _ => panic!(),
         };
-        match runner.run(&"1.5+5.4")? {
+        match runner.run(&env, &"1.5+5.4")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Float(6.9)),
             _ => panic!(),
         };
@@ -271,11 +278,12 @@ mod simple_script_tests {
     #[test]
     fn test_multiplication_and_addition() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
-        match runner.run(&"1+2*3")? {
+        let env = RuntimeEnvironment {};
+        match runner.run(&env, &"1+2*3")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(7)),
             _ => panic!(),
         };
-        match runner.run(&"2*3+4")? {
+        match runner.run(&env, &"2*3+4")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(10)),
             _ => panic!(),
         };
@@ -285,11 +293,12 @@ mod simple_script_tests {
     #[test]
     fn test_parenthesis_priority() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
-        match runner.run(&"(1+2)*3")? {
+        let env = RuntimeEnvironment {};
+        match runner.run(&env, &"(1+2)*3")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(9)),
             _ => panic!(),
         };
-        match runner.run(&"2*(3+4)")? {
+        match runner.run(&env, &"2*(3+4)")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(14)),
             _ => panic!(),
         };
