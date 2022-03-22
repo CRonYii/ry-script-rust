@@ -1,4 +1,4 @@
-use super::{token::{Token, TokenMap, TokenType, Tokens}, error::LexerError};
+use super::{token::{Token, SpecialTokenMap, Tokens, ParserToken, LexerTokenMap}, error::LexerError};
 
 #[derive(Debug, PartialEq, Eq)]
 enum LexerState {
@@ -13,29 +13,30 @@ enum LexerState {
     End,
 }
 
-struct LexerResult {
+struct LexerResult<T: ParserToken<T>> {
     state: LexerState,
-    create: Option<TokenType>, // Token type
+    create: Option<T>, // Token type
     buffer: bool,
     move_cursor: bool,
 }
 
-pub struct Lexer {
+pub struct Lexer<T: ParserToken<T>> {
     state: LexerState,
     buffer: String,
-    tokens: Vec<Token>,
-    signs: TokenMap,
+    tokens: Vec<Token<T>>,
+    special_token_map: SpecialTokenMap<T>,
+    token_map: LexerTokenMap<T>
 }
 
-impl Lexer {
-    const ERROR_RESULT: LexerResult = LexerResult {
+impl<T: ParserToken<T>> Lexer<T> {
+    const ERROR_RESULT: LexerResult<T> = LexerResult {
         state: LexerState::Error,
         create: None,
         buffer: false,
         move_cursor: false,
     };
 
-    fn handle_normal_state(&self, ch: char) -> Result<LexerResult, LexerError> {
+    fn handle_normal_state(&self, ch: char) -> Result<LexerResult<T>, LexerError> {
         let result = match ch {
             '_' | _ if ch.is_alphabetic() => LexerResult {
                 state: LexerState::Identifier,
@@ -49,7 +50,7 @@ impl Lexer {
                 buffer: false,
                 move_cursor: true,
             },
-            _ if self.signs.is_valid_sign_character(ch) => LexerResult {
+            _ if self.special_token_map.is_valid_sign_character(ch) => LexerResult {
                 state: LexerState::Sign,
                 create: None,
                 buffer: true,
@@ -75,7 +76,7 @@ impl Lexer {
             },
             '\0' => LexerResult {
                 state: LexerState::End,
-                create: Some(TokenType::EOF),
+                create: Some(self.token_map.eof),
                 buffer: false,
                 move_cursor: false,
             },
@@ -84,7 +85,7 @@ impl Lexer {
         Ok(result)
     }
 
-    fn handle_identifier_state(&self, ch: char) -> Result<LexerResult, LexerError> {
+    fn handle_identifier_state(&self, ch: char) -> Result<LexerResult<T>, LexerError> {
         let result = match ch {
             '_' | _ if ch.is_ascii_alphanumeric() => LexerResult {
                 state: LexerState::Identifier,
@@ -92,15 +93,15 @@ impl Lexer {
                 buffer: true,
                 move_cursor: true,
             },
-            _ if self.signs.is_keyword(&self.buffer) => LexerResult {
+            _ if self.special_token_map.is_keyword(&self.buffer) => LexerResult {
                 state: LexerState::Normal,
-                create: self.signs.get_keyword_type(&self.buffer),
+                create: self.special_token_map.get_keyword_type(&self.buffer),
                 buffer: false,
                 move_cursor: false,
             },
             _ => LexerResult {
                 state: LexerState::Normal,
-                create: Some(TokenType::Identifier),
+                create: Some(self.token_map.identifier),
                 buffer: false,
                 move_cursor: false,
             },
@@ -108,17 +109,17 @@ impl Lexer {
         Ok(result)
     }
 
-    fn handle_sign_state(&self, ch: char) -> Result<LexerResult, LexerError> {
+    fn handle_sign_state(&self, ch: char) -> Result<LexerResult<T>, LexerError> {
         let mut tmp = self.buffer.clone();
         tmp.push(ch);
-        let result = if self.signs.is_valid_sign(&tmp) {
+        let result = if self.special_token_map.is_valid_sign(&tmp) {
             LexerResult {
                 state: LexerState::Sign,
                 create: None,
                 buffer: true,
                 move_cursor: true,
             }
-        } else if let Some(token) = self.signs.get_sign_type(&self.buffer) {
+        } else if let Some(token) = self.special_token_map.get_sign_type(&self.buffer) {
             LexerResult {
                 state: LexerState::Normal,
                 create: Some(token),
@@ -131,7 +132,7 @@ impl Lexer {
         Ok(result)
     }
 
-    fn handle_integer_state(&self, ch: char) -> Result<LexerResult, LexerError> {
+    fn handle_integer_state(&self, ch: char) -> Result<LexerResult<T>, LexerError> {
         let result = match ch {
             _ if ch.is_ascii_digit() => LexerResult {
                 state: LexerState::Integer,
@@ -147,7 +148,7 @@ impl Lexer {
             },
             _ => LexerResult {
                 state: LexerState::Normal,
-                create: Some(TokenType::Integer),
+                create: Some(self.token_map.integer),
                 buffer: false,
                 move_cursor: false,
             },
@@ -155,7 +156,7 @@ impl Lexer {
         Ok(result)
     }
 
-    fn handle_float_state(&self, ch: char) -> Result<LexerResult, LexerError> {
+    fn handle_float_state(&self, ch: char) -> Result<LexerResult<T>, LexerError> {
         let result = match ch {
             _ if ch.is_ascii_digit() => LexerResult {
                 state: LexerState::Float,
@@ -165,7 +166,7 @@ impl Lexer {
             },
             _ => LexerResult {
                 state: LexerState::Normal,
-                create: Some(TokenType::Float),
+                create: Some(self.token_map.float),
                 buffer: false,
                 move_cursor: false,
             },
@@ -173,13 +174,13 @@ impl Lexer {
         Ok(result)
     }
 
-    fn handle_string_state(&self, ch: char) -> Result<LexerResult, LexerError> {
+    fn handle_string_state(&self, ch: char) -> Result<LexerResult<T>, LexerError> {
         let result= match ch {
             '\0' => return Err(LexerError::Error("Unexpected EOF")),
             '"' => LexerResult {
                 // TODO implement escape character \"
                 state: LexerState::Normal,
-                create: Some(TokenType::String),
+                create: Some(self.token_map.string),
                 buffer: false,
                 move_cursor: true,
             },
@@ -193,7 +194,7 @@ impl Lexer {
         Ok(result)
     }
 
-    fn handle_comment_state(&self, ch: char) -> Result<LexerResult, LexerError> {
+    fn handle_comment_state(&self, ch: char) -> Result<LexerResult<T>, LexerError> {
         let result = match ch {
             '\0' | '\n' => LexerResult {
                 state: LexerState::Normal,
@@ -211,12 +212,13 @@ impl Lexer {
         Ok(result)
     }
 
-    pub fn new() -> Lexer {
+    pub fn new(token_map: LexerTokenMap<T>, special_token_map: SpecialTokenMap<T>) -> Lexer<T> {
         Lexer {
             state: LexerState::Normal,
             buffer: String::new(),
             tokens: Vec::new(),
-            signs: TokenMap::init(),
+            token_map,
+            special_token_map,
         }
     }
 
@@ -226,7 +228,7 @@ impl Lexer {
         self.tokens.clear();
     }
 
-    pub fn parse(&mut self, input: &str) -> Result<Tokens, LexerError> {
+    pub fn parse(&mut self, input: &str) -> Result<Tokens<T>, LexerError> {
         self.reset();
         let mut iter = input.chars();
         let mut move_cursor = false;

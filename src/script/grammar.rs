@@ -1,15 +1,16 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
 use super::error::{GrammarError, RuntimeError};
-use super::{ast::RuntimeValue, runner::GrammarRule, token::TokenType};
+use super::token::ParserToken;
+use super::{ast::RuntimeValue, runner::GrammarRule};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum Symbol {
+pub enum Symbol<T: ParserToken<T>> {
     NonTerminal(&'static str),
-    Terminal(TokenType),
+    Terminal(T),
 }
 
-impl Display for Symbol {
+impl<T: ParserToken<T>> Display for Symbol<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Symbol::NonTerminal(s) => write!(f, "{}", s)?,
@@ -20,19 +21,19 @@ impl Display for Symbol {
 }
 
 #[derive(Debug, Hash, Eq)]
-pub struct Grammar {
+pub struct Grammar<T: ParserToken<T>> {
     pub rule_number: usize,
-    pub lval: Rc<Symbol>,
-    pub rvals: Vec<Rc<Symbol>>,
+    pub lval: Rc<Symbol<T>>,
+    pub rvals: Vec<Rc<Symbol<T>>>,
 }
 
-impl PartialEq for Grammar {
+impl<T: ParserToken<T>> PartialEq for Grammar<T> {
     fn eq(&self, other: &Self) -> bool {
         self.rule_number == other.rule_number
     }
 }
 
-impl Display for Grammar {
+impl<T: ParserToken<T>> Display for Grammar<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> ", self.lval)?;
         for rval in &self.rvals {
@@ -42,22 +43,25 @@ impl Display for Grammar {
     }
 }
 
-type SymbolMap = HashMap<&'static str, Rc<Symbol>>;
+type SymbolMap<T> = HashMap<&'static str, Rc<Symbol<T>>>;
 
-pub struct TerminalSymbolDef(pub &'static str, pub TokenType);
+#[derive(Clone, Copy)]
+pub struct TerminalSymbolDef<T: ParserToken<T>>(pub &'static str, pub T);
 
-pub struct GrammarSet {
-    pub grammars: Vec<Rc<Grammar>>,
-    pub terminal_symbols: SymbolMap,
-    pub non_terminal_symbols: SymbolMap,
+pub struct GrammarSet<T: ParserToken<T>> {
+    pub grammars: Vec<Rc<Grammar<T>>>,
+    pub eof: T,
+    pub terminal_symbols: SymbolMap<T>,
+    pub non_terminal_symbols: SymbolMap<T>,
 }
 
-impl GrammarSet {
+impl<T: ParserToken<T>> GrammarSet<T> {
     /* Pre-condition: The first grammar is expected to be the starter grammar */
-    pub fn from<T: RuntimeValue, E: RuntimeError>(
-        grammars: &Vec<GrammarRule<T, E>>,
-        terminals: &[TerminalSymbolDef],
-    ) -> Result<GrammarSet, GrammarError> {
+    pub fn from<R: RuntimeValue<T>, E: RuntimeError>(
+        grammars: &Vec<GrammarRule<T, R, E>>,
+        terminals: &Vec<TerminalSymbolDef<T>>,
+        eof: T,
+    ) -> Result<GrammarSet<T>, GrammarError> {
         // terminal symbols
         let mut terminal_symbols = HashMap::new();
         terminals.iter().for_each(|def| {
@@ -78,6 +82,7 @@ impl GrammarSet {
             grammars: vec![],
             terminal_symbols,
             non_terminal_symbols,
+            eof,
         };
         for text in grammars {
             grammar.parse_grammar(text.0)?;
@@ -85,7 +90,7 @@ impl GrammarSet {
         Ok(grammar)
     }
 
-    fn get_symbol(&self, symbol: &'static str) -> Option<Rc<Symbol>> {
+    fn get_symbol(&self, symbol: &'static str) -> Option<Rc<Symbol<T>>> {
         if let Some(terminal_symbol) = self.terminal_symbols.get(symbol) {
             Some(Rc::clone(terminal_symbol))
         } else if let Some(non_terminal_symbol) = self.non_terminal_symbols.get(symbol) {
@@ -131,7 +136,7 @@ impl GrammarSet {
         Ok(())
     }
 
-    pub fn find_grammars(&self, lval: Rc<Symbol>) -> Vec<Rc<Grammar>> {
+    pub fn find_grammars(&self, lval: Rc<Symbol<T>>) -> Vec<Rc<Grammar<T>>> {
         self.grammars
             .iter()
             .filter(|&g| lval == g.lval)

@@ -6,36 +6,52 @@ use super::error::{RuntimeError, SyntaxError};
 use super::grammar::{Symbol, TerminalSymbolDef};
 use super::lexer::Lexer;
 use super::lrparser::{LRParser, TransitionAction};
-use super::token::Tokens;
+use super::token::{LexerTokenMap, ParserToken, SpecialTokenMap, Tokens};
 
-pub struct ScriptRunner<T: RuntimeValue, E: RuntimeError> {
-    lexer: Lexer,
-    lr_parser: LRParser,
-    reducer: Vec<ExpressionReducer<T, E>>,
+pub struct ScriptRunner<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> {
+    lexer: Lexer<T>,
+    lr_parser: LRParser<T>,
+    reducer: Vec<ExpressionReducer<T, R, E>>,
 }
 
-pub struct GrammarRule<T: RuntimeValue, E: RuntimeError>(
+pub struct GrammarRule<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError>(
     pub &'static str,
-    pub ExpressionReducer<T, E>,
+    pub ExpressionReducer<T, R, E>,
 );
 
-impl<T: RuntimeValue, E: RuntimeError> ScriptRunner<T, E> {
+impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<T, R, E> {
     pub fn from(
-        grammars: Vec<GrammarRule<T, E>>,
-        terminal_symbols: &[TerminalSymbolDef],
-    ) -> super::error::Result<ScriptRunner<T, E>, E> {
-        let grammar_set = GrammarSet::from(&grammars, &terminal_symbols)?;
+        grammars: Vec<GrammarRule<T, R, E>>,
+        token_map: LexerTokenMap<T>,
+        operator: &[TerminalSymbolDef<T>],
+        keyword: &[TerminalSymbolDef<T>],
+    ) -> super::error::Result<ScriptRunner<T, R, E>, E> {
+        let mut terminal_symbols = vec![
+            TerminalSymbolDef("id", token_map.identifier),
+            TerminalSymbolDef("str", token_map.string),
+            TerminalSymbolDef("int", token_map.integer),
+            TerminalSymbolDef("float", token_map.float),
+            TerminalSymbolDef("EOF", token_map.eof), 
+        ];
+        for &symbol in operator {
+            terminal_symbols.push(symbol);
+        }
+        for &symbol in keyword {
+            terminal_symbols.push(symbol);
+        }
+        let grammar_set = GrammarSet::from(&grammars, &terminal_symbols, token_map.eof)?;
         let lr_parser = LRParser::lr0(grammar_set)?;
         #[cfg(feature = "debug_lrparser")]
         println!("{}", lr_parser);
+        let special_token_map = SpecialTokenMap::new(operator, keyword);
         Ok(ScriptRunner {
-            lexer: Lexer::new(),
+            lexer: Lexer::new(token_map, special_token_map),
             lr_parser,
             reducer: grammars.into_iter().map(|g| g.1).collect(),
         })
     }
 
-    pub fn run(&mut self, input: &String) -> super::error::Result<ASTNode<T, E>, E> {
+    pub fn run(&mut self, input: &String) -> super::error::Result<ASTNode<T, R, E>, E> {
         let tokens = self.lexer.parse(input)?;
         #[cfg(feature = "debug_lexer")]
         println!("{}", tokens);
@@ -43,10 +59,10 @@ impl<T: RuntimeValue, E: RuntimeError> ScriptRunner<T, E> {
         Ok(execution_result)
     }
 
-    pub fn lr_parse(&self, tokens: Tokens) -> super::error::Result<ASTNode<T, E>, E> {
+    pub fn lr_parse(&self, tokens: Tokens<T>) -> super::error::Result<ASTNode<T, R, E>, E> {
         /* parse stack initial state 0 */
         let mut parse_stack = Vec::from([0]);
-        let mut ast_stack = Vec::<ASTNode<T, E>>::new();
+        let mut ast_stack = Vec::<ASTNode<T, R, E>>::new();
         let mut iter = tokens.0.into_iter();
         let mut token = match iter.next() {
             Some(token) => token,
@@ -81,15 +97,11 @@ impl<T: RuntimeValue, E: RuntimeError> ScriptRunner<T, E> {
                     let rule_idx = rule_number - 1;
                     let grammar = match self.lr_parser.grammar_set.grammars.get(rule_idx) {
                         Some(grammar) => grammar,
-                        None => {
-                            return Err(ParseError::GrammarDoesNotExist(*rule_number).into())
-                        }
+                        None => return Err(ParseError::GrammarDoesNotExist(*rule_number).into()),
                     };
                     /* pop AST stack to form AST params and the push a new AST expression */
                     if grammar.rvals.len() > parse_stack.len() {
-                        return Err(
-                            ParseError::Error("stack does not have enough items").into()
-                        );
+                        return Err(ParseError::Error("stack does not have enough items").into());
                     }
                     /* Pop rvals.len() items */
                     let remains = ast_stack.len() - grammar.rvals.len();
@@ -104,15 +116,11 @@ impl<T: RuntimeValue, E: RuntimeError> ScriptRunner<T, E> {
                     /* Perform GOTO */
                     let state = match parse_stack.last() {
                         Some(&state) => state,
-                        None => {
-                            return Err(ParseError::Error("stack is empty when goto").into())
-                        }
+                        None => return Err(ParseError::Error("stack is empty when goto").into()),
                     };
                     let goto_state = match self.lr_parser.get_action(state, &grammar.lval) {
                         Ok(TransitionAction::Goto(state)) => *state,
-                        _ => {
-                            return Err(ParseError::Error("goto action does not exist").into())
-                        }
+                        _ => return Err(ParseError::Error("goto action does not exist").into()),
                     };
                     parse_stack.push(goto_state);
                 }
@@ -127,9 +135,7 @@ impl<T: RuntimeValue, E: RuntimeError> ScriptRunner<T, E> {
                         }
                         return Ok(expr);
                     } else {
-                        return Err(
-                            ParseError::Error("accepted but ast stack is empty").into()
-                        );
+                        return Err(ParseError::Error("accepted but ast stack is empty").into());
                     }
                 }
                 TransitionAction::Goto(_) => {
@@ -141,44 +147,44 @@ impl<T: RuntimeValue, E: RuntimeError> ScriptRunner<T, E> {
     }
 }
 
-pub struct ReducerArg<T: RuntimeValue, E: RuntimeError> {
-    args: Vec<ASTNode<T, E>>,
+pub struct ReducerArg<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> {
+    args: Vec<ASTNode<T, R, E>>,
 }
 
-impl<T: RuntimeValue, E: RuntimeError> ReducerArg<T, E> {
-    fn from(args: Vec<ASTNode<T, E>>) -> Self {
+impl<T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ReducerArg<T, R, E> {
+    fn from(args: Vec<ASTNode<T, R, E>>) -> Self {
         Self { args }
     }
 
-    pub fn eval(&mut self) -> Result<ASTNode<T, E>, E> {
+    pub fn eval(&mut self) -> Result<ASTNode<T, R, E>, E> {
         self.args.pop().unwrap().evaluate()
     }
 
-    pub fn nth_eval(&mut self, n: usize) -> Result<ASTNode<T, E>, E> {
+    pub fn nth_eval(&mut self, n: usize) -> Result<ASTNode<T, R, E>, E> {
         self.nth_node(n).evaluate()
     }
 
-    pub fn eval_skip(&mut self, n: usize) -> Result<ASTNode<T, E>, E> {
+    pub fn eval_skip(&mut self, n: usize) -> Result<ASTNode<T, R, E>, E> {
         let node = self.eval();
         self.skip_n(n);
         node
     }
 
-    pub fn val(&mut self) -> ASTNode<T, E> {
+    pub fn val(&mut self) -> ASTNode<T, R, E> {
         self.args.pop().unwrap()
     }
 
-    pub fn nth_val(&mut self, n: usize) -> ASTNode<T, E> {
+    pub fn nth_val(&mut self, n: usize) -> ASTNode<T, R, E> {
         self.nth_node(n)
     }
 
-    pub fn val_skip(&mut self, n: usize) -> ASTNode<T, E> {
+    pub fn val_skip(&mut self, n: usize) -> ASTNode<T, R, E> {
         let node = self.val();
         self.skip_n(n);
         node
     }
 
-    fn nth_node(&mut self, n: usize) -> ASTNode<T, E> {
+    fn nth_node(&mut self, n: usize) -> ASTNode<T, R, E> {
         for _ in 0..n {
             self.skip()
         }

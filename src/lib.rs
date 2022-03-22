@@ -10,8 +10,35 @@ use script::ast::{never_reducer, value_reducer, ASTNode, RuntimeValue};
 use script::error::RuntimeError;
 use script::grammar::TerminalSymbolDef;
 use script::runner::{GrammarRule, ReducerArg, ScriptRunner};
-use script::token::{Token, TokenType};
+use script::token::{LexerTokenMap, ParserToken, Token};
 
+/* Defines the types of token that will be used */
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum TokenType {
+    Identifier,
+    Integer,
+    Float,
+    String,
+    True,
+    False,
+    Plus,
+    Minus,
+    Multiply,
+    LeftParenthese,
+    RightParenthese,
+    EOF,
+}
+
+impl ParserToken<TokenType> for TokenType {
+    fn entity(self, value: String) -> Token<TokenType> {
+        Token {
+            r#type: self,
+            value,
+        }
+    }
+}
+
+/* Define runtime errors */
 pub type Result<T> = std::result::Result<T, ScriptRuntimeError>;
 
 impl RuntimeError for ScriptRuntimeError {}
@@ -34,21 +61,25 @@ impl std::fmt::Display for ScriptRuntimeError {
     }
 }
 
-impl RuntimeValue for Value {}
+/* Defines runtime */
+impl RuntimeValue<TokenType> for Value {}
 
 #[derive(Debug)]
 pub enum Value {
     String(String),
     Integer(i64),
     Float(f64),
+    Bool(bool),
 }
 
-impl std::convert::From<Token> for Value {
-    fn from(token: Token) -> Self {
+impl std::convert::From<Token<TokenType>> for Value {
+    fn from(token: Token<TokenType>) -> Self {
         match token.r#type {
             TokenType::String => Value::String(token.value),
             TokenType::Integer => Value::Integer(token.value.parse().unwrap()),
             TokenType::Float => Value::Float(token.value.parse().unwrap()),
+            TokenType::True => Value::Bool(true),
+            TokenType::False => Value::Bool(false),
             _ => panic!(
                 "Unexpected token {:?} cannot be converted to a value",
                 token.r#type
@@ -63,11 +94,13 @@ impl std::fmt::Display for Value {
             Value::Integer(num) => write!(f, "{}", num)?,
             Value::Float(num) => write!(f, "{}", num)?,
             Value::String(str) => write!(f, "{}", str)?,
+            Value::Bool(bool) => write!(f, "{}", bool)?,
         }
         Ok(())
     }
 }
 
+/* Value casters */
 impl Value {
     pub fn int(self) -> Result<i64> {
         match self {
@@ -86,19 +119,24 @@ impl Value {
     }
 }
 
+/* Value operators */
 impl Value {
     fn mul(self, rhs: Value) -> Result<Value> {
         match self {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Ok(Value::Integer(lhs * rhs)),
                 Value::Float(rhs) => Ok(Value::Float((lhs as f64) * rhs)),
-                Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Multiplication", rhs)),
+                _ => {
+                    Err(ScriptRuntimeError::NotImplemented("Multiplication", rhs))
+                }
             },
             Value::Float(lhs) => {
                 let val = lhs * rhs.float()?;
                 Ok(Value::Float(val))
             }
-            Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Multiplication", self)),
+            _ => {
+                Err(ScriptRuntimeError::NotImplemented("Multiplication", self))
+            }
         }
     }
 
@@ -107,13 +145,17 @@ impl Value {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Ok(Value::Integer(lhs + rhs)),
                 Value::Float(rhs) => Ok(Value::Float((lhs as f64) + rhs)),
-                Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Addition", rhs)),
+                _ => {
+                    Err(ScriptRuntimeError::NotImplemented("Addition", rhs))
+                }
             },
             Value::Float(lhs) => {
                 let val = lhs + rhs.float()?;
                 Ok(Value::Float(val))
             }
-            Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Addition", self)),
+            _ => {
+                Err(ScriptRuntimeError::NotImplemented("Addition", self))
+            }
         }
     }
 
@@ -121,14 +163,16 @@ impl Value {
         match self {
             Value::Integer(val) => Ok(Value::Integer(-val)),
             Value::Float(val) => Ok(Value::Float(-val)),
-            Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Negative", self)),
+            Value::Bool(val) => Ok(Value::Bool(!val)),
+            _ => Err(ScriptRuntimeError::NotImplemented("Negative", self)),
         }
     }
 }
 
+/* Grammar reducers that takes advantage of RuntimeValue */
 fn multiply_reducer(
-    mut args: ReducerArg<Value, ScriptRuntimeError>,
-) -> ASTNode<Value, ScriptRuntimeError> {
+    mut args: ReducerArg<TokenType, Value, ScriptRuntimeError>,
+) -> ASTNode<TokenType, Value, ScriptRuntimeError> {
     ASTNode::ActionExpression(
         "a * b",
         Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
@@ -143,8 +187,8 @@ fn multiply_reducer(
 }
 
 fn add_reducer(
-    mut args: ReducerArg<Value, ScriptRuntimeError>,
-) -> ASTNode<Value, ScriptRuntimeError> {
+    mut args: ReducerArg<TokenType, Value, ScriptRuntimeError>,
+) -> ASTNode<TokenType, Value, ScriptRuntimeError> {
     ASTNode::ActionExpression(
         "a + b",
         Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
@@ -159,8 +203,8 @@ fn add_reducer(
 }
 
 fn negative_number_reducer(
-    mut args: ReducerArg<Value, ScriptRuntimeError>,
-) -> ASTNode<Value, ScriptRuntimeError> {
+    mut args: ReducerArg<TokenType, Value, ScriptRuntimeError>,
+) -> ASTNode<TokenType, Value, ScriptRuntimeError> {
     ASTNode::ActionExpression(
         "a + b",
         Box::new(move || match args.nth_eval(1)? {
@@ -175,8 +219,31 @@ fn negative_number_reducer(
 }
 
 pub fn init_math_script_parser(
-) -> script::error::Result<ScriptRunner<Value, ScriptRuntimeError>, ScriptRuntimeError> {
-    let grammars: Vec<GrammarRule<Value, ScriptRuntimeError>> = vec![
+) -> script::error::Result<ScriptRunner<TokenType, Value, ScriptRuntimeError>, ScriptRuntimeError> {
+    /* These construct the Lexer */
+    let token_map = LexerTokenMap {
+        eof: TokenType::EOF,
+        identifier: TokenType::Identifier,
+        integer: TokenType::Integer,
+        float: TokenType::Float,
+        string: TokenType::String,
+    };
+    let operator = [
+        /* Specify the possible operator that the lexer will recognize */
+        TerminalSymbolDef("+", TokenType::Plus),
+        TerminalSymbolDef("-", TokenType::Minus),
+        TerminalSymbolDef("*", TokenType::Multiply),
+        TerminalSymbolDef("(", TokenType::LeftParenthese),
+        TerminalSymbolDef(")", TokenType::RightParenthese),
+    ];
+    let keyword = [
+        /* Reserved keyword that are automatically converted from Identifer */
+        TerminalSymbolDef("true", TokenType::True),
+        TerminalSymbolDef("false", TokenType::False),
+    ];
+
+    /* These construct the LR Parser */
+    let grammars: Vec<GrammarRule<TokenType, Value, ScriptRuntimeError>> = vec![
         GrammarRule("B -> S EOF", never_reducer),
         GrammarRule("S -> A1", value_reducer),
         GrammarRule("A1 -> A2", value_reducer),
@@ -190,19 +257,12 @@ pub fn init_math_script_parser(
         GrammarRule("Val -> - num", negative_number_reducer),
         GrammarRule("num -> int", value_reducer),
         GrammarRule("num -> float", value_reducer),
+        GrammarRule("num -> true", value_reducer),
+        GrammarRule("num -> false", value_reducer),
         GrammarRule("Val -> ( A1 )", |mut args| args.nth_val(1)),
     ];
-    let terminal_symbols = [
-        TerminalSymbolDef("(", TokenType::LeftParenthese),
-        TerminalSymbolDef(")", TokenType::RightParenthese),
-        TerminalSymbolDef("*", TokenType::Multiply),
-        TerminalSymbolDef("+", TokenType::Plus),
-        TerminalSymbolDef("-", TokenType::Minus),
-        TerminalSymbolDef("str", TokenType::String),
-        TerminalSymbolDef("int", TokenType::Integer),
-        TerminalSymbolDef("float", TokenType::Float),
-        TerminalSymbolDef("EOF", TokenType::EOF),
-    ];
 
-    Ok(ScriptRunner::from(grammars, &terminal_symbols)?)
+    Ok(ScriptRunner::from(
+        grammars, token_map, &operator, &keyword,
+    )?)
 }

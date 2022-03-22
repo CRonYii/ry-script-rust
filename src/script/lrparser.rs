@@ -7,7 +7,7 @@ use std::{
 use super::{
     error::{GrammarError, ParseError},
     grammar::{Grammar, GrammarSet, Symbol},
-    token::TokenType,
+    token::ParserToken,
 };
 
 pub enum TransitionAction {
@@ -30,16 +30,16 @@ impl Display for TransitionAction {
 }
 
 #[derive(Debug)]
-struct ItemSet {
-    items: Vec<Kernel>,
+struct ItemSet<T: ParserToken<T>> {
+    items: Vec<Kernel<T>>,
 }
 
 /* TODO: Should really use a hashset instead (or maybe a BTreeSet?)
  * Issue 1. cannot add while itering
  * Issue 2. needs to impl eq and hash for kernel
  */
-impl ItemSet {
-    fn has(&self, kernel: &Kernel) -> bool {
+impl<T: ParserToken<T>> ItemSet<T> {
+    fn has(&self, kernel: &Kernel<T>) -> bool {
         match self.items.iter().find(|&k| k == kernel) {
             Some(_) => true,
             None => false,
@@ -47,13 +47,13 @@ impl ItemSet {
     }
 }
 
-impl PartialEq for ItemSet {
+impl<T: ParserToken<T>> PartialEq for ItemSet<T> {
     fn eq(&self, other: &Self) -> bool {
         self.items.iter().filter(|&k| !other.has(k)).count() == 0
     }
 }
 
-impl Display for ItemSet {
+impl<T: ParserToken<T>> Display for ItemSet<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} items", self.items.len())?;
         for (i, kernel) in self.items.iter().enumerate() {
@@ -64,13 +64,13 @@ impl Display for ItemSet {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct Kernel {
-    grammar: Rc<Grammar>,
+struct Kernel<T: ParserToken<T>> {
+    grammar: Rc<Grammar<T>>,
     rval_idx: usize,
 }
 
-impl Kernel {
-    fn current_symbol(&self) -> Option<Rc<Symbol>> {
+impl<T: ParserToken<T>> Kernel<T> {
+    fn current_symbol(&self) -> Option<Rc<Symbol<T>>> {
         match self.grammar.rvals.get(self.rval_idx) {
             None => None,
             Some(val) => Some(Rc::clone(val)),
@@ -78,7 +78,7 @@ impl Kernel {
     }
 }
 
-impl Display for Kernel {
+impl<T: ParserToken<T>> Display for Kernel<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> ", self.grammar.lval)?;
         for (i, rval) in self.grammar.rvals.iter().enumerate() {
@@ -94,16 +94,20 @@ impl Display for Kernel {
     }
 }
 
-pub struct LRParser {
-    pub grammar_set: GrammarSet,
-    table: Vec<HashMap<Rc<Symbol>, TransitionAction>>,
+pub struct LRParser<T: ParserToken<T>> {
+    pub grammar_set: GrammarSet<T>,
+    table: Vec<HashMap<Rc<Symbol<T>>, TransitionAction>>,
 }
 
-impl LRParser {
-    pub fn lr0(grammar_set: GrammarSet) -> Result<LRParser, GrammarError> {
+impl<T: ParserToken<T>> LRParser<T> {
+    pub fn lr0(grammar_set: GrammarSet<T>) -> Result<LRParser<T>, GrammarError> {
         let mut transition_table = Vec::new();
         let starter_grammar = match grammar_set.grammars.get(0) {
-            None => return Err(GrammarError::Error("Grammar set does not have a starter grammar")),
+            None => {
+                return Err(GrammarError::Error(
+                    "Grammar set does not have a starter grammar",
+                ))
+            }
             Some(rule) => rule,
         };
         let starter_item_set = ItemSet {
@@ -116,20 +120,20 @@ impl LRParser {
         let mut item_set_idx = 0;
         while let Some(item_set) = item_sets.get_mut(item_set_idx) {
             // populate a transition row
-            let mut transition_row = HashMap::<Rc<Symbol>, TransitionAction>::new();
-            let mut new_itemsets: HashMap<Rc<Symbol>, ItemSet> = HashMap::new();
+            let mut transition_row = HashMap::<Rc<Symbol<T>>, TransitionAction>::new();
+            let mut new_itemsets: HashMap<Rc<Symbol<T>>, ItemSet<T>> = HashMap::new();
             let mut i = 0;
             while let Some(kernel) = item_set.items.get(i) {
                 match kernel.current_symbol() {
                     Some(symbol) => {
                         match *symbol {
-                            Symbol::Terminal(TokenType::EOF) => {
+                            Symbol::Terminal(t) if t == grammar_set.eof => {
                                 // EOF - Accept
                                 transition_row.insert(symbol, TransitionAction::Accept);
                             }
                             Symbol::NonTerminal(_) => {
                                 // expand item sets
-                                let mut kernels: Vec<Kernel> = grammar_set
+                                let mut kernels: Vec<Kernel<T>> = grammar_set
                                     .find_grammars(symbol)
                                     .into_iter()
                                     .map(|grammar| Kernel {
@@ -156,7 +160,7 @@ impl LRParser {
             for kernel in &item_set.items {
                 match kernel.current_symbol() {
                     Some(symbol) => match *symbol {
-                        Symbol::Terminal(TokenType::EOF) => (/* do nothing */),
+                        Symbol::Terminal(t) if t == grammar_set.eof => (/* do nothing */),
                         _ => {
                             let new_kernel = Kernel {
                                 grammar: Rc::clone(&kernel.grammar),
@@ -193,7 +197,7 @@ impl LRParser {
                         transition_row.insert(symbol, TransitionAction::Goto(action_value))
                     }
                 };
-    
+
                 // add brand new itemset
                 if state == -1 {
                     item_sets.push(itemset);
@@ -208,20 +212,22 @@ impl LRParser {
         })
     }
 
-    pub fn get_action(&self, state: usize, symbol: &Symbol) -> Result<&TransitionAction, ParseError> {
+    pub fn get_action(
+        &self,
+        state: usize,
+        symbol: &Symbol<T>,
+    ) -> Result<&TransitionAction, ParseError> {
         match self.table.get(state) {
             Some(row) => match row.get(symbol) {
                 Some(action) => Ok(action),
-                None => {
-                    return Err(ParseError::UnexpectedSymbol(format!("{}", symbol)))
-                }
+                None => return Err(ParseError::UnexpectedSymbol(format!("{}", symbol))),
             },
             None => return Err(ParseError::StateDoesNotExist(state)),
         }
     }
 }
 
-impl Display for LRParser {
+impl<T: ParserToken<T>> Display for LRParser<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for terminal_symbol in self.grammar_set.terminal_symbols.values() {
             write!(f, "| {:<10} ", format!("{}", terminal_symbol))?;
