@@ -249,19 +249,19 @@ mod simple_script_tests {
     #[test]
     fn test_addition() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
-        match runner.run(&"1+1".to_string())? {
+        match runner.run(&"1+1")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(2)),
             _ => panic!(),
         };
-        match runner.run(&"1+2.5".to_string())? {
+        match runner.run(&"1+2.5")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Float(3.5)),
             _ => panic!(),
         };
-        match runner.run(&"1.5+40".to_string())? {
+        match runner.run(&"1.5+40")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Float(41.5)),
             _ => panic!(),
         };
-        match runner.run(&"1.5+5.4".to_string())? {
+        match runner.run(&"1.5+5.4")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Float(6.9)),
             _ => panic!(),
         };
@@ -271,11 +271,11 @@ mod simple_script_tests {
     #[test]
     fn test_multiplication_and_addition() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
-        match runner.run(&"1+2*3".to_string())? {
+        match runner.run(&"1+2*3")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(7)),
             _ => panic!(),
         };
-        match runner.run(&"2*3+4".to_string())? {
+        match runner.run(&"2*3+4")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(10)),
             _ => panic!(),
         };
@@ -285,11 +285,11 @@ mod simple_script_tests {
     #[test]
     fn test_parenthesis_priority() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
-        match runner.run(&"(1+2)*3".to_string())? {
+        match runner.run(&"(1+2)*3")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(9)),
             _ => panic!(),
         };
-        match runner.run(&"2*(3+4)".to_string())? {
+        match runner.run(&"2*(3+4)")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(14)),
             _ => panic!(),
         };
