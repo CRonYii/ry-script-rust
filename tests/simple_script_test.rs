@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod simple_script_tests {
+    use std::{collections::HashMap, hash::Hash};
+
     use ry_script::{
         ast::{never_reducer, value_reducer, ASTNode, RuntimeValue},
         error::{RuntimeError, ScriptError},
@@ -12,6 +14,7 @@ mod simple_script_tests {
     #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
     enum TokenType {
         Identifier,
+        Assignment,
         Integer,
         Float,
         String,
@@ -40,8 +43,8 @@ mod simple_script_tests {
     impl RuntimeError for ScriptRuntimeError {}
 
     enum ScriptRuntimeError {
-        CannotCast(&'static str, Value),
-        NotImplemented(&'static str, Value),
+        CannotCast(&'static str, String),
+        NotImplemented(&'static str, String),
     }
 
     impl std::fmt::Display for ScriptRuntimeError {
@@ -58,12 +61,27 @@ mod simple_script_tests {
     }
 
     /* Defines runtime */
-    struct RuntimeEnvironment {}
+    struct RuntimeEnvironment {
+        variables: HashMap<String, Value>,
+    }
+
+    impl RuntimeEnvironment {
+        fn new() -> Self {
+            Self {
+                variables: HashMap::new(),
+            }
+        }
+
+        fn set_var(&mut self, key: &String, val: Value) {
+            self.variables.insert(key.clone(), val);
+        }
+    }
 
     impl RuntimeValue<TokenType> for Value {}
 
     #[derive(Debug, PartialEq)]
     enum Value {
+        Identifier(String),
         String(String),
         Integer(i64),
         Float(f64),
@@ -78,6 +96,7 @@ mod simple_script_tests {
                 TokenType::Float => Value::Float(token.value.parse().unwrap()),
                 TokenType::True => Value::Bool(true),
                 TokenType::False => Value::Bool(false),
+                TokenType::Identifier => Value::Identifier(token.value),
                 _ => panic!(
                     "Unexpected token {:?} cannot be converted to a value",
                     token.r#type
@@ -93,65 +112,122 @@ mod simple_script_tests {
                 Value::Float(num) => write!(f, "{}", num)?,
                 Value::String(str) => write!(f, "{}", str)?,
                 Value::Bool(bool) => write!(f, "{}", bool)?,
+                Value::Identifier(name) => write!(f, "id({})", name)?,
             }
             Ok(())
         }
     }
 
-    /* Value casters */
+    /* Value getters */
     impl Value {
-        fn float(self) -> RuntimeResult<f64> {
+        fn value<'a>(&'a self, env: &'a RuntimeEnvironment) -> &'a Value {
             match self {
-                Value::Integer(val) => Ok(val as f64),
-                Value::Float(val) => Ok(val),
-                _ => Err(ScriptRuntimeError::CannotCast("float", self)),
+                Value::Identifier(name) => match env.variables.get(name) {
+                    Some(value) => value,
+                    None => self,
+                },
+                _ => self,
+            }
+        }
+
+        fn float(&self) -> RuntimeResult<f64> {
+            match self {
+                Value::Integer(val) => Ok(*val as f64),
+                Value::Float(val) => Ok(*val),
+                _ => Err(ScriptRuntimeError::CannotCast("float", format!("{}", self))),
             }
         }
     }
 
+    /* TODO: these should be moved to runtime environment */
     /* Value operators */
     impl Value {
-        fn mul(self, rhs: Value) -> RuntimeResult<Value> {
+        fn assign(self, env: &mut RuntimeEnvironment, rhs: Value) -> RuntimeResult<Value> {
             match self {
-                Value::Integer(lhs) => match rhs {
-                    Value::Integer(rhs) => Ok(Value::Integer(lhs * rhs)),
-                    Value::Float(rhs) => Ok(Value::Float((lhs as f64) * rhs)),
-                    _ => Err(ScriptRuntimeError::NotImplemented("Multiplication", rhs)),
-                },
-                Value::Float(lhs) => {
-                    let val = lhs * rhs.float()?;
-                    Ok(Value::Float(val))
+                Value::Identifier(key) => {
+                    env.set_var(&key, rhs);
+                    Ok(Value::Identifier(key))
                 }
-                _ => Err(ScriptRuntimeError::NotImplemented("Multiplication", self)),
+                _ => Err(ScriptRuntimeError::NotImplemented(
+                    "Assignment",
+                    format!("{}", self),
+                )),
             }
         }
 
-        fn add(self, rhs: Value) -> RuntimeResult<Value> {
+        fn mul(&self, rhs: &Value) -> RuntimeResult<Value> {
+            match self {
+                Value::Integer(lhs) => match rhs {
+                    Value::Integer(rhs) => Ok(Value::Integer(*lhs * *rhs)),
+                    Value::Float(rhs) => Ok(Value::Float((*lhs as f64) * *rhs)),
+                    _ => Err(ScriptRuntimeError::NotImplemented(
+                        "Multiplication",
+                        format!("{}", rhs),
+                    )),
+                },
+                Value::Float(lhs) => {
+                    let val = *lhs * rhs.float()?;
+                    Ok(Value::Float(val))
+                }
+                _ => Err(ScriptRuntimeError::NotImplemented(
+                    "Multiplication",
+                    format!("{}", self),
+                )),
+            }
+        }
+
+        fn add(&self, rhs: &Value) -> RuntimeResult<Value> {
             match self {
                 Value::Integer(lhs) => match rhs {
                     Value::Integer(rhs) => Ok(Value::Integer(lhs + rhs)),
-                    Value::Float(rhs) => Ok(Value::Float((lhs as f64) + rhs)),
-                    _ => Err(ScriptRuntimeError::NotImplemented("Addition", rhs)),
+                    Value::Float(rhs) => Ok(Value::Float((*lhs as f64) + rhs)),
+                    _ => Err(ScriptRuntimeError::NotImplemented(
+                        "Addition",
+                        format!("{}", rhs),
+                    )),
                 },
                 Value::Float(lhs) => {
                     let val = lhs + rhs.float()?;
                     Ok(Value::Float(val))
                 }
-                _ => Err(ScriptRuntimeError::NotImplemented("Addition", self)),
+                _ => Err(ScriptRuntimeError::NotImplemented(
+                    "Addition",
+                    format!("{}", self),
+                )),
             }
         }
 
-        fn negative(self) -> RuntimeResult<Value> {
+        fn negative(&self) -> RuntimeResult<Value> {
             match self {
                 Value::Integer(val) => Ok(Value::Integer(-val)),
                 Value::Float(val) => Ok(Value::Float(-val)),
                 Value::Bool(val) => Ok(Value::Bool(!val)),
-                _ => Err(ScriptRuntimeError::NotImplemented("Negative", self)),
+                _ => Err(ScriptRuntimeError::NotImplemented(
+                    "Negative",
+                    format!("{}", self),
+                )),
             }
         }
     }
 
     /* Grammar reducers that takes advantage of RuntimeValue */
+    fn assignment_reducer(
+        mut args: ReducerArg<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError>,
+    ) -> ASTNode<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError> {
+        ASTNode::ActionExpression(
+            "id = val",
+            Box::new(
+                move |env| match (args.eval_skip(env, 1)?, args.eval(env)?) {
+                    (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
+                        println!("eval {:?} = {:?}", lhs, rhs);
+                        Ok(ASTNode::Value(lhs.assign(env, rhs)?))
+                    }
+                    _ => panic!("Parse Error: Reducer expected value but non-value were given"),
+                },
+            ),
+        )
+    }
+
     fn multiply_reducer(
         mut args: ReducerArg<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError>,
     ) -> ASTNode<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError> {
@@ -162,6 +238,8 @@ mod simple_script_tests {
                     (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
                         #[cfg(feature = "debug_ast")]
                         println!("eval {:?} * {:?}", lhs, rhs);
+                        let lhs = lhs.value(env);
+                        let rhs = rhs.value(env);
                         Ok(ASTNode::Value(lhs.mul(rhs)?))
                     }
                     _ => panic!("Parse Error: Reducer expected value but non-value were given"),
@@ -180,7 +258,9 @@ mod simple_script_tests {
                     (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
                         #[cfg(feature = "debug_ast")]
                         println!("eval {:?} + {:?}", lhs, rhs);
-                        Ok(ASTNode::Value(lhs.add(rhs)?))
+                        let lhs = lhs.value(env);
+                        let rhs = rhs.value(env);
+                        Ok(ASTNode::Value(lhs.add(&rhs)?))
                     }
                     _ => panic!("Parse Error: Reducer expected value but non-value were given"),
                 },
@@ -197,6 +277,7 @@ mod simple_script_tests {
                 ASTNode::Value(val) => {
                     #[cfg(feature = "debug_ast")]
                     println!("eval - {:?}", val);
+                    let val = val.value(env);
                     Ok(ASTNode::Value(val.negative()?))
                 }
                 _ => panic!("Parse Error: Reducer expected value but non-value were given"),
@@ -218,6 +299,7 @@ mod simple_script_tests {
         };
         let operator = [
             /* Specify the possible operator that the lexer will recognize */
+            TerminalSymbolDef("=", TokenType::Assignment),
             TerminalSymbolDef("+", TokenType::Plus),
             TerminalSymbolDef("-", TokenType::Minus),
             TerminalSymbolDef("*", TokenType::Multiply),
@@ -234,6 +316,7 @@ mod simple_script_tests {
         let grammars: Vec<GrammarRule<RuntimeEnvironment, TokenType, Value, ScriptRuntimeError>> = vec![
             GrammarRule("B -> S EOF", never_reducer),
             GrammarRule("S -> A1", value_reducer),
+            GrammarRule("S -> id = A1", assignment_reducer),
             GrammarRule("A1 -> A2", value_reducer),
             GrammarRule("A1 -> A1 + A2", add_reducer),
             GrammarRule("A2 -> A3", value_reducer),
@@ -243,6 +326,7 @@ mod simple_script_tests {
             GrammarRule("Val -> num", value_reducer),
             GrammarRule("Val -> + num", |mut args| args.nth_val(1)),
             GrammarRule("Val -> - num", negative_number_reducer),
+            GrammarRule("num -> id", value_reducer),
             GrammarRule("num -> int", value_reducer),
             GrammarRule("num -> float", value_reducer),
             GrammarRule("num -> true", value_reducer),
@@ -255,20 +339,20 @@ mod simple_script_tests {
     #[test]
     fn test_addition() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
-        let env = RuntimeEnvironment {};
-        match runner.run(&env, &"1+1")? {
+        let mut env = RuntimeEnvironment::new();
+        match runner.run(&mut env, &"1+1")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(2)),
             _ => panic!(),
         };
-        match runner.run(&env, &"1+2.5")? {
+        match runner.run(&mut env, &"1+2.5")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Float(3.5)),
             _ => panic!(),
         };
-        match runner.run(&env, &"1.5+40")? {
+        match runner.run(&mut env, &"1.5+40")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Float(41.5)),
             _ => panic!(),
         };
-        match runner.run(&env, &"1.5+5.4")? {
+        match runner.run(&mut env, &"1.5+5.4")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Float(6.9)),
             _ => panic!(),
         };
@@ -278,12 +362,12 @@ mod simple_script_tests {
     #[test]
     fn test_multiplication_and_addition() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
-        let env = RuntimeEnvironment {};
-        match runner.run(&env, &"1+2*3")? {
+        let mut env = RuntimeEnvironment::new();
+        match runner.run(&mut env, &"1+2*3")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(7)),
             _ => panic!(),
         };
-        match runner.run(&env, &"2*3+4")? {
+        match runner.run(&mut env, &"2*3+4")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(10)),
             _ => panic!(),
         };
@@ -293,13 +377,41 @@ mod simple_script_tests {
     #[test]
     fn test_parenthesis_priority() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
-        let env = RuntimeEnvironment {};
-        match runner.run(&env, &"(1+2)*3")? {
+        let mut env = RuntimeEnvironment::new();
+        match runner.run(&mut env, &"(1+2)*3")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(9)),
             _ => panic!(),
         };
-        match runner.run(&env, &"2*(3+4)")? {
+        match runner.run(&mut env, &"2*(3+4)")? {
             ASTNode::Value(value) => assert_eq!(value, Value::Integer(14)),
+            _ => panic!(),
+        };
+        Ok(())
+    }
+
+    #[test]
+    fn test_assignment() -> Result<(), ScriptError<ScriptRuntimeError>> {
+        let mut runner = init_simple_script_parser()?;
+        let mut env = RuntimeEnvironment::new();
+        match runner.run(&mut env, &"foo = 10")? {
+            ASTNode::Value(value) => assert_eq!(value, Value::Identifier("foo".to_string())),
+            _ => panic!(),
+        };
+        let id = Value::Identifier("foo".to_string());
+        let value = id.value(&mut env);
+        assert_eq!(value, &Value::Integer(10));
+        match runner.run(&mut env, &"foo = foo * foo")? {
+            ASTNode::Value(value) => match value {
+                Value::Identifier(_) => {
+                    let value = value.value(&mut env);
+                    assert_eq!(value, &Value::Integer(100));
+                },
+                _ => panic!(),
+            },
+            _ => panic!(),
+        };
+        match runner.run(&mut env, &"-foo + -20")? {
+            ASTNode::Value(value) => assert_eq!(value, Value::Integer(-120)),
             _ => panic!(),
         };
         Ok(())

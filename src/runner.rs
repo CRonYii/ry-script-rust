@@ -48,7 +48,7 @@ impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<E
         })
     }
 
-    pub fn run(&mut self, env: &ENV, input: &str) -> super::error::Result<ASTNode<ENV, T, R, E>, E> {
+    pub fn run(&mut self, env: &mut ENV, input: &str) -> super::error::Result<ASTNode<ENV, T, R, E>, E> {
         let tokens = self.lexer.parse(input)?;
         #[cfg(feature = "debug_lexer")]
         println!("{}", tokens);
@@ -153,15 +153,15 @@ impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ReducerArg<ENV
         Self { args }
     }
 
-    pub fn eval(&mut self, env: &ENV) -> Result<ASTNode<ENV, T, R, E>, E> {
+    pub fn eval(&mut self, env: &mut ENV) -> Result<ASTNode<ENV, T, R, E>, E> {
         self.args.pop().unwrap().evaluate(env)
     }
 
-    pub fn nth_eval(&mut self, env: &ENV, n: usize) -> Result<ASTNode<ENV, T, R, E>, E> {
+    pub fn nth_eval(&mut self, env: &mut ENV, n: usize) -> Result<ASTNode<ENV, T, R, E>, E> {
         self.nth_node(n).evaluate(env)
     }
 
-    pub fn eval_skip(&mut self, env: &ENV, n: usize) -> Result<ASTNode<ENV, T, R, E>, E> {
+    pub fn eval_skip(&mut self, env: &mut ENV, n: usize) -> Result<ASTNode<ENV, T, R, E>, E> {
         let node = self.eval(env);
         self.skip_n(n);
         node

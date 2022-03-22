@@ -29,13 +29,13 @@ pub enum ASTNode<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> {
     Token(Token<T>),
     ActionExpression(
         &'static str,
-        Box<dyn FnMut(&ENV) -> Result<ASTNode<ENV, T, R, E>, E>>,
+        Box<dyn FnMut(&mut ENV) -> Result<ASTNode<ENV, T, R, E>, E>>,
     ),
     Value(R),
 }
 
 impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ASTNode<ENV, T, R, E> {
-    pub fn evaluate(self, env: &ENV) -> Result<ASTNode<ENV, T, R, E>, E> {
+    pub fn evaluate(self, env: &mut ENV) -> Result<ASTNode<ENV, T, R, E>, E> {
         match self {
             ASTNode::ActionExpression(_, mut action) => action(env),
             ASTNode::Token(token) => Ok(ASTNode::Value(R::from(token))),
