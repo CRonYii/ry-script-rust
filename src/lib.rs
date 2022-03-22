@@ -7,9 +7,32 @@ mod math_tests;
 pub use math::matrix::Matrix;
 
 use script::ast::{never_reducer, value_reducer, ASTNode, RuntimeValue};
+use script::error::RuntimeError;
 use script::grammar::TerminalSymbolDef;
 use script::runner::{GrammarRule, ReducerArg, ScriptRunner};
 use script::token::{Token, TokenType};
+
+pub type Result<T> = std::result::Result<T, ScriptRuntimeError>;
+
+impl RuntimeError for ScriptRuntimeError {}
+
+pub enum ScriptRuntimeError {
+    CannotCast(&'static str, Value),
+    NotImplemented(&'static str, Value),
+}
+
+impl std::fmt::Display for ScriptRuntimeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScriptRuntimeError::CannotCast(name, val) => {
+                write!(f, "Cannot cast {:?} to {}", val, name)
+            }
+            ScriptRuntimeError::NotImplemented(name, val) => {
+                write!(f, "{:?} does not implemented {}", val, name)
+            }
+        }
+    }
+}
 
 impl RuntimeValue for Value {}
 
@@ -26,7 +49,10 @@ impl std::convert::From<Token> for Value {
             TokenType::String => Value::String(token.value),
             TokenType::Integer => Value::Integer(token.value.parse().unwrap()),
             TokenType::Float => Value::Float(token.value.parse().unwrap()),
-            _ => panic!("Parser Error: Unexpcted token {:?} cannot be converted to a value", token.r#type),
+            _ => panic!(
+                "Unexpected token {:?} cannot be converted to a value",
+                token.r#type
+            ),
         }
     }
 }
@@ -43,64 +69,66 @@ impl std::fmt::Display for Value {
 }
 
 impl Value {
-    pub fn int(self) -> Result<i64, String> {
+    pub fn int(self) -> Result<i64> {
         match self {
             Value::Integer(val) => Ok(val),
             Value::Float(val) => Ok(val as i64),
-            _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
+            _ => Err(ScriptRuntimeError::CannotCast("int", self)),
         }
     }
 
-    pub fn float(self) -> Result<f64, String> {
+    pub fn float(self) -> Result<f64> {
         match self {
             Value::Integer(val) => Ok(val as f64),
             Value::Float(val) => Ok(val),
-            _ => Err(format!("Runtime Error: Cannot cast {:?} to int", self)),
+            _ => Err(ScriptRuntimeError::CannotCast("float", self)),
         }
     }
 }
 
 impl Value {
-    fn mul(self, rhs: Value) -> Result<Value, String> {
+    fn mul(self, rhs: Value) -> Result<Value> {
         match self {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Ok(Value::Integer(lhs * rhs)),
                 Value::Float(rhs) => Ok(Value::Float((lhs as f64) * rhs)),
-                Value::String(_) => Err(format!("Runtime Error: Multiplication is not implemented for {:?}", rhs)),
+                Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Multiplication", rhs)),
             },
             Value::Float(lhs) => {
                 let val = lhs * rhs.float()?;
                 Ok(Value::Float(val))
-            },
-            Value::String(_) => Err(format!("Runtime Error: Multiplication is not implemented for {:?}", self)),
+            }
+            Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Multiplication", self)),
         }
     }
 
-    fn add(self, rhs: Value) -> Result<Value, String> {
+    fn add(self, rhs: Value) -> Result<Value> {
         match self {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Ok(Value::Integer(lhs + rhs)),
                 Value::Float(rhs) => Ok(Value::Float((lhs as f64) + rhs)),
-                Value::String(_) => Err(format!("Runtime Error: Addition is not implemented for {:?}", rhs)),
+                Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Addition", rhs)),
             },
             Value::Float(lhs) => {
                 let val = lhs + rhs.float()?;
                 Ok(Value::Float(val))
-            },
-            Value::String(_) => Err(format!("Runtime Error: Addition is not implemented for {:?}", self)),
+            }
+            Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Addition", self)),
         }
     }
 
-    pub fn negative(self) -> Result<Value, String> {
+    pub fn negative(self) -> Result<Value> {
         match self {
             Value::Integer(val) => Ok(Value::Integer(-val)),
             Value::Float(val) => Ok(Value::Float(-val)),
-            Value::String(_) => Err(format!("Runtime Error: Negative is not implemented for {:?}", self)),
+            Value::String(_) => Err(ScriptRuntimeError::NotImplemented("Negative", self)),
         }
     }
 }
 
-fn multiply_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
+fn multiply_reducer(
+    mut args: ReducerArg<Value, ScriptRuntimeError>,
+) -> ASTNode<Value, ScriptRuntimeError> {
     ASTNode::ActionExpression(
         "a * b",
         Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
@@ -114,7 +142,9 @@ fn multiply_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
     )
 }
 
-fn add_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
+fn add_reducer(
+    mut args: ReducerArg<Value, ScriptRuntimeError>,
+) -> ASTNode<Value, ScriptRuntimeError> {
     ASTNode::ActionExpression(
         "a + b",
         Box::new(move || match (args.eval_skip(1)?, args.eval()?) {
@@ -128,7 +158,9 @@ fn add_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
     )
 }
 
-fn negative_number_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
+fn negative_number_reducer(
+    mut args: ReducerArg<Value, ScriptRuntimeError>,
+) -> ASTNode<Value, ScriptRuntimeError> {
     ASTNode::ActionExpression(
         "a + b",
         Box::new(move || match args.nth_eval(1)? {
@@ -142,8 +174,9 @@ fn negative_number_reducer(mut args: ReducerArg<Value>) -> ASTNode<Value> {
     )
 }
 
-pub fn init_math_script_parser() -> Result<ScriptRunner<Value>, String> {
-    let grammars: Vec<GrammarRule<Value>> = vec![
+pub fn init_math_script_parser(
+) -> script::error::Result<ScriptRunner<Value, ScriptRuntimeError>, ScriptRuntimeError> {
+    let grammars: Vec<GrammarRule<Value, ScriptRuntimeError>> = vec![
         GrammarRule("B -> S EOF", never_reducer),
         GrammarRule("S -> A1", value_reducer),
         GrammarRule("A1 -> A2", value_reducer),

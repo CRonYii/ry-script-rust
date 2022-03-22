@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
-use super::{runner::GrammarRule, token::TokenType, ast::RuntimeValue};
+use super::error::{GrammarError, RuntimeError};
+use super::{ast::RuntimeValue, runner::GrammarRule, token::TokenType};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Symbol {
@@ -53,10 +54,10 @@ pub struct GrammarSet {
 
 impl GrammarSet {
     /* Pre-condition: The first grammar is expected to be the starter grammar */
-    pub fn from<T: RuntimeValue>(
-        grammars: &Vec<GrammarRule<T>>,
+    pub fn from<T: RuntimeValue, E: RuntimeError>(
+        grammars: &Vec<GrammarRule<T, E>>,
         terminals: &[TerminalSymbolDef],
-    ) -> Result<GrammarSet, String> {
+    ) -> Result<GrammarSet, GrammarError> {
         // terminal symbols
         let mut terminal_symbols = HashMap::new();
         terminals.iter().for_each(|def| {
@@ -69,7 +70,7 @@ impl GrammarSet {
             let mut tokens = text.0.split(" ");
             let lval = match tokens.next() {
                 Some(token) => token,
-                None => return Err(format!("Grammar has no lval")),
+                None => return Err(GrammarError::InvalidGrammarText(text.0)),
             };
             non_terminal_symbols.insert(lval, Rc::new(Symbol::NonTerminal(lval)));
         }
@@ -96,33 +97,28 @@ impl GrammarSet {
         }
     }
 
-    fn parse_grammar(&mut self, text: &'static str) -> Result<(), String> {
+    fn parse_grammar(&mut self, text: &'static str) -> Result<(), GrammarError> {
         let mut tokens = text.split(" ");
         let lval = match tokens.next() {
             Some(token) => match self.get_symbol(token) {
                 Some(symbol) => match *symbol {
                     Symbol::NonTerminal(_) => symbol,
-                    _ => return Err(format!("lval {} is not a non-terminal symbol", token)),
+                    _ => return Err(GrammarError::InvalidSymbol(token)),
                 },
-                None => return Err(format!("lval {} is not a valid non-terminal symbol", token)),
+                None => return Err(GrammarError::InvalidSymbol(token)),
             },
-            None => return Err(format!("Grammar has no lval")),
+            None => return Err(GrammarError::InvalidGrammarText(text)),
         };
         match tokens.next() {
             Some(token) if token == "->" => (),
-            _ => {
-                return Err(format!(
-                    "{}, Expected lval -> rvals, but -> is not presented",
-                    text
-                ))
-            }
+            _ => return Err(GrammarError::InvalidGrammarText(text)),
         };
         let rvals = match tokens
             .map(|token| self.get_symbol(token))
             .collect::<Option<Vec<_>>>()
         {
             Some(rvals) => rvals,
-            None => return Err(format!("{} rvals contains invalid symbol", text)),
+            None => return Err(GrammarError::InvalidGrammarText(text)),
         };
         let grammar = Rc::new(Grammar {
             rule_number: self.grammars.len() + 1,

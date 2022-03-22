@@ -5,6 +5,7 @@ use std::{
 };
 
 use super::{
+    error::{GrammarError, ParseError},
     grammar::{Grammar, GrammarSet, Symbol},
     token::TokenType,
 };
@@ -99,10 +100,10 @@ pub struct LRParser {
 }
 
 impl LRParser {
-    pub fn lr0(grammar_set: GrammarSet) -> Result<LRParser, String> {
+    pub fn lr0(grammar_set: GrammarSet) -> Result<LRParser, GrammarError> {
         let mut transition_table = Vec::new();
         let starter_grammar = match grammar_set.grammars.get(0) {
-            None => return Err(format!("Grammar set does not have a starter grammar")),
+            None => return Err(GrammarError::Error("Grammar set does not have a starter grammar")),
             Some(rule) => rule,
         };
         let starter_item_set = ItemSet {
@@ -207,15 +208,15 @@ impl LRParser {
         })
     }
 
-    pub fn get_action(&self, state: usize, symbol: &Symbol) -> Result<&TransitionAction, String> {
+    pub fn get_action(&self, state: usize, symbol: &Symbol) -> Result<&TransitionAction, ParseError> {
         match self.table.get(state) {
             Some(row) => match row.get(symbol) {
                 Some(action) => Ok(action),
                 None => {
-                    return Err(format!("Parse Error: Unexpected token: {}", symbol))
+                    return Err(ParseError::UnexpectedSymbol(format!("{}", symbol)))
                 }
             },
-            None => return Err(format!("Parse Error: state {} does not exist", state)),
+            None => return Err(ParseError::StateDoesNotExist(state)),
         }
     }
 }
