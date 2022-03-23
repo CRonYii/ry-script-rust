@@ -50,8 +50,6 @@ impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<E
 
     pub fn run(&mut self, env: &mut ENV, input: &str) -> super::error::Result<R, E> {
         let tokens = self.lexer.parse(input)?;
-        #[cfg(feature = "debug_lexer")]
-        println!("{}", tokens);
         let execution_result = match self.lr_parse(tokens)?.evaluate(env)? {
             ASTNode::Value(value) => value,
             _ => return Err(ParseError::IncorrectParseResult.into()),
