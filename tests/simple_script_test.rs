@@ -71,15 +71,11 @@ mod simple_script_tests {
                 variables: HashMap::new(),
             }
         }
-
-        fn set_var(&mut self, key: &String, val: Value) {
-            self.variables.insert(key.clone(), val);
-        }
     }
 
     impl RuntimeValue<TokenType> for Value {}
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Clone)]
     enum Value {
         Identifier(String),
         String(String),
@@ -140,44 +136,48 @@ mod simple_script_tests {
     }
 
     /* TODO: these should be moved to runtime environment */
-    /* Value operators */
-    impl Value {
-        fn assign(self, env: &mut RuntimeEnvironment, rhs: Value) -> RuntimeResult<Value> {
-            match self {
+    impl RuntimeEnvironment {
+        fn assign(&mut self, lhs: Value, rhs: Value) -> RuntimeResult<Value> {
+            let rhs = rhs.value(self).clone();
+            match lhs {
                 Value::Identifier(key) => {
-                    env.set_var(&key, rhs);
+                    self.variables.insert(key.clone(), rhs);
                     Ok(Value::Identifier(key))
                 }
                 _ => Err(ScriptRuntimeError::NotImplemented(
                     "Assignment",
-                    format!("{}", self),
+                    format!("{}", lhs),
                 )),
             }
         }
 
-        fn mul(&self, rhs: &Value) -> RuntimeResult<Value> {
-            match self {
+        fn mul(&self, lhs: &Value, rhs: &Value) -> RuntimeResult<Value> {
+            let lhs = lhs.value(self);
+            let rhs = rhs.value(self);
+            match lhs {
                 Value::Integer(lhs) => match rhs {
-                    Value::Integer(rhs) => Ok(Value::Integer(*lhs * *rhs)),
-                    Value::Float(rhs) => Ok(Value::Float((*lhs as f64) * *rhs)),
+                    Value::Integer(rhs) => Ok(Value::Integer(lhs * rhs)),
+                    Value::Float(rhs) => Ok(Value::Float((*lhs as f64) * rhs)),
                     _ => Err(ScriptRuntimeError::NotImplemented(
                         "Multiplication",
                         format!("{}", rhs),
                     )),
                 },
                 Value::Float(lhs) => {
-                    let val = *lhs * rhs.float()?;
+                    let val = lhs * rhs.float()?;
                     Ok(Value::Float(val))
                 }
                 _ => Err(ScriptRuntimeError::NotImplemented(
                     "Multiplication",
-                    format!("{}", self),
+                    format!("{}", lhs),
                 )),
             }
         }
 
-        fn add(&self, rhs: &Value) -> RuntimeResult<Value> {
-            match self {
+        fn add(&self, lhs: &Value, rhs: &Value) -> RuntimeResult<Value> {
+            let lhs = lhs.value(self);
+            let rhs = rhs.value(self);
+            match lhs {
                 Value::Integer(lhs) => match rhs {
                     Value::Integer(rhs) => Ok(Value::Integer(lhs + rhs)),
                     Value::Float(rhs) => Ok(Value::Float((*lhs as f64) + rhs)),
@@ -192,19 +192,20 @@ mod simple_script_tests {
                 }
                 _ => Err(ScriptRuntimeError::NotImplemented(
                     "Addition",
-                    format!("{}", self),
+                    format!("{}", lhs),
                 )),
             }
         }
 
-        fn negative(&self) -> RuntimeResult<Value> {
-            match self {
+        fn negative(&self, val: &Value) -> RuntimeResult<Value> {
+            let val = val.value(self);
+            match val {
                 Value::Integer(val) => Ok(Value::Integer(-val)),
                 Value::Float(val) => Ok(Value::Float(-val)),
                 Value::Bool(val) => Ok(Value::Bool(!val)),
                 _ => Err(ScriptRuntimeError::NotImplemented(
                     "Negative",
-                    format!("{}", self),
+                    format!("{}", val),
                 )),
             }
         }
@@ -220,7 +221,7 @@ mod simple_script_tests {
                 move |env| match (args.eval_skip(env, 1)?, args.eval(env)?) {
                     (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
                         println!("eval {:?} = {:?}", lhs, rhs);
-                        Ok(ASTNode::Value(lhs.assign(env, rhs)?))
+                        Ok(ASTNode::Value(env.assign(lhs, rhs)?))
                     }
                     _ => panic!("Parse Error: Reducer expected value but non-value were given"),
                 },
@@ -238,9 +239,7 @@ mod simple_script_tests {
                     (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
                         #[cfg(feature = "debug_ast")]
                         println!("eval {:?} * {:?}", lhs, rhs);
-                        let lhs = lhs.value(env);
-                        let rhs = rhs.value(env);
-                        Ok(ASTNode::Value(lhs.mul(rhs)?))
+                        Ok(ASTNode::Value(env.mul(&lhs, &rhs)?))
                     }
                     _ => panic!("Parse Error: Reducer expected value but non-value were given"),
                 },
@@ -258,9 +257,7 @@ mod simple_script_tests {
                     (ASTNode::Value(lhs), ASTNode::Value(rhs)) => {
                         #[cfg(feature = "debug_ast")]
                         println!("eval {:?} + {:?}", lhs, rhs);
-                        let lhs = lhs.value(env);
-                        let rhs = rhs.value(env);
-                        Ok(ASTNode::Value(lhs.add(&rhs)?))
+                        Ok(ASTNode::Value(env.add(&lhs, &rhs)?))
                     }
                     _ => panic!("Parse Error: Reducer expected value but non-value were given"),
                 },
@@ -277,8 +274,7 @@ mod simple_script_tests {
                 ASTNode::Value(val) => {
                     #[cfg(feature = "debug_ast")]
                     println!("eval - {:?}", val);
-                    let val = val.value(env);
-                    Ok(ASTNode::Value(val.negative()?))
+                    Ok(ASTNode::Value(env.negative(&val)?))
                 }
                 _ => panic!("Parse Error: Reducer expected value but non-value were given"),
             }),
@@ -405,7 +401,7 @@ mod simple_script_tests {
                 Value::Identifier(_) => {
                     let value = value.value(&mut env);
                     assert_eq!(value, &Value::Integer(100));
-                },
+                }
                 _ => panic!(),
             },
             _ => panic!(),
