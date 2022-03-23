@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use super::ast::{ASTNode, ExpressionReducer, RuntimeValue};
 use super::error::{ParseError, RuntimeError, SyntaxError};
 use super::grammar::{GrammarSet, Symbol, TerminalSymbolDef};
@@ -103,7 +105,7 @@ impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<E
                     }
                     /* Pop rvals.len() items */
                     let remains = ast_stack.len() - grammar.rvals.len();
-                    let params = ast_stack.drain(remains..).rev().collect();
+                    let params = ast_stack.drain(remains..).collect();
                     let args = ReducerArg::new(params);
                     let ast_node = self.reducer[rule_idx](args);
                     #[cfg(feature = "debug_lrparser")]
@@ -146,16 +148,16 @@ impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<E
 }
 
 pub struct ReducerArg<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> {
-    args: Vec<ASTNode<ENV, T, R, E>>,
+    args: VecDeque<ASTNode<ENV, T, R, E>>,
 }
 
 impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ReducerArg<ENV, T, R, E> {
-    fn new(args: Vec<ASTNode<ENV, T, R, E>>) -> Self {
+    fn new(args: VecDeque<ASTNode<ENV, T, R, E>>) -> Self {
         Self { args }
     }
 
     pub fn eval(&mut self, env: &mut ENV) -> Result<ASTNode<ENV, T, R, E>, E> {
-        self.args.pop().unwrap().evaluate(env)
+        self.args.pop_front().unwrap().evaluate(env)
     }
 
     pub fn nth_eval(&mut self, env: &mut ENV, n: usize) -> Result<ASTNode<ENV, T, R, E>, E> {
@@ -169,7 +171,7 @@ impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ReducerArg<ENV
     }
 
     pub fn val(&mut self) -> ASTNode<ENV, T, R, E> {
-        self.args.pop().unwrap()
+        self.args.pop_front().unwrap()
     }
 
     pub fn nth_val(&mut self, n: usize) -> ASTNode<ENV, T, R, E> {
@@ -186,11 +188,11 @@ impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ReducerArg<ENV
         for _ in 0..n {
             self.skip()
         }
-        self.args.pop().unwrap()
+        self.args.pop_front().unwrap()
     }
 
     pub fn skip(&mut self) {
-        self.args.pop();
+        self.args.pop_front();
     }
 
     pub fn skip_n(&mut self, n: usize) {
