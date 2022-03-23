@@ -135,7 +135,6 @@ mod simple_script_tests {
         }
     }
 
-    /* TODO: these should be moved to runtime environment */
     impl RuntimeEnvironment {
         fn assign(&mut self, lhs: Value, rhs: Value) -> RuntimeResult<Value> {
             let rhs = rhs.value(self).clone();
