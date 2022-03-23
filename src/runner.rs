@@ -1,6 +1,6 @@
 use super::ast::{ASTNode, ExpressionReducer, RuntimeValue};
-use super::error::{RuntimeError, SyntaxError, ParseError};
-use super::grammar::{Symbol, TerminalSymbolDef, GrammarSet};
+use super::error::{ParseError, RuntimeError, SyntaxError};
+use super::grammar::{GrammarSet, Symbol, TerminalSymbolDef};
 use super::lexer::Lexer;
 use super::lrparser::{LRParser, TransitionAction};
 use super::token::{LexerTokenMap, ParserToken, SpecialTokenMap, Tokens};
@@ -28,7 +28,7 @@ impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<E
             TerminalSymbolDef("str", token_map.string),
             TerminalSymbolDef("int", token_map.integer),
             TerminalSymbolDef("float", token_map.float),
-            TerminalSymbolDef("EOF", token_map.eof), 
+            TerminalSymbolDef("EOF", token_map.eof),
         ];
         for &symbol in operator {
             terminal_symbols.push(symbol);
@@ -48,11 +48,14 @@ impl<ENV, T: ParserToken<T>, R: RuntimeValue<T>, E: RuntimeError> ScriptRunner<E
         })
     }
 
-    pub fn run(&mut self, env: &mut ENV, input: &str) -> super::error::Result<ASTNode<ENV, T, R, E>, E> {
+    pub fn run(&mut self, env: &mut ENV, input: &str) -> super::error::Result<R, E> {
         let tokens = self.lexer.parse(input)?;
         #[cfg(feature = "debug_lexer")]
         println!("{}", tokens);
-        let execution_result = self.lr_parse(tokens)?.evaluate(env)?;
+        let execution_result = match self.lr_parse(tokens)?.evaluate(env)? {
+            ASTNode::Value(value) => value,
+            _ => return Err(ParseError::IncorrectParseResult.into()),
+        };
         Ok(execution_result)
     }
 

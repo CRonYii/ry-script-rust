@@ -335,22 +335,10 @@ mod simple_script_tests {
     fn test_addition() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
         let mut env = RuntimeEnvironment::new();
-        match runner.run(&mut env, &"1+1")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Integer(2)),
-            _ => panic!(),
-        };
-        match runner.run(&mut env, &"1+2.5")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Float(3.5)),
-            _ => panic!(),
-        };
-        match runner.run(&mut env, &"1.5+40")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Float(41.5)),
-            _ => panic!(),
-        };
-        match runner.run(&mut env, &"1.5+5.4")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Float(6.9)),
-            _ => panic!(),
-        };
+        assert_eq!(runner.run(&mut env, &"1+1")?, Value::Integer(2));
+        assert_eq!(runner.run(&mut env, &"1+2.5")?, Value::Float(3.5));
+        assert_eq!(runner.run(&mut env, &"1.5+40")?, Value::Float(41.5));
+        assert_eq!(runner.run(&mut env, &"1.5+5.4")?, Value::Float(6.9));
         Ok(())
     }
 
@@ -358,14 +346,8 @@ mod simple_script_tests {
     fn test_multiplication_and_addition() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
         let mut env = RuntimeEnvironment::new();
-        match runner.run(&mut env, &"1+2*3")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Integer(7)),
-            _ => panic!(),
-        };
-        match runner.run(&mut env, &"2*3+4")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Integer(10)),
-            _ => panic!(),
-        };
+        assert_eq!(runner.run(&mut env, &"1+2*3")?, Value::Integer(7));
+        assert_eq!(runner.run(&mut env, &"2*3+4")?, Value::Integer(10));
         Ok(())
     }
 
@@ -373,14 +355,8 @@ mod simple_script_tests {
     fn test_parenthesis_priority() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
         let mut env = RuntimeEnvironment::new();
-        match runner.run(&mut env, &"(1+2)*3")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Integer(9)),
-            _ => panic!(),
-        };
-        match runner.run(&mut env, &"2*(3+4)")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Integer(14)),
-            _ => panic!(),
-        };
+        assert_eq!(runner.run(&mut env, &"(1+2)*3")?, Value::Integer(9));
+        assert_eq!(runner.run(&mut env, &"2*(3+4)")?, Value::Integer(14));
         Ok(())
     }
 
@@ -388,27 +364,17 @@ mod simple_script_tests {
     fn test_assignment() -> Result<(), ScriptError<ScriptRuntimeError>> {
         let mut runner = init_simple_script_parser()?;
         let mut env = RuntimeEnvironment::new();
-        match runner.run(&mut env, &"foo = 10")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Identifier("foo".to_string())),
-            _ => panic!(),
-        };
-        let id = Value::Identifier("foo".to_string());
-        let value = id.value(&mut env);
-        assert_eq!(value, &Value::Integer(10));
-        match runner.run(&mut env, &"foo = foo * foo")? {
-            ASTNode::Value(value) => match value {
-                Value::Identifier(_) => {
-                    let value = value.value(&mut env);
-                    assert_eq!(value, &Value::Integer(100));
-                }
-                _ => panic!(),
-            },
-            _ => panic!(),
-        };
-        match runner.run(&mut env, &"-foo + -20")? {
-            ASTNode::Value(value) => assert_eq!(value, Value::Integer(-120)),
-            _ => panic!(),
-        };
+        assert_eq!(
+            runner.run(&mut env, &"foo = 10")?,
+            Value::Identifier("foo".to_string())
+        );
+        assert_eq!(
+            Value::Identifier("foo".to_string()).value(&mut env),
+            &Value::Integer(10)
+        );
+        let value = runner.run(&mut env, &"foo = foo * foo")?;
+        assert_eq!(value.value(&env), &Value::Integer(100));
+        assert_eq!(runner.run(&mut env, &"-foo + -20")?, Value::Integer(-120));
         Ok(())
     }
 }

@@ -79,6 +79,7 @@ where
 
 pub enum ParseError {
     Error(&'static str),
+    IncorrectParseResult,
     UnexpectedSymbol(String),
     GrammarDoesNotExist(usize),
     StateDoesNotExist(usize),
@@ -91,6 +92,7 @@ impl std::fmt::Display for ParseError {
             ParseError::UnexpectedSymbol(symbol) => write!(f, "Unexpected symbol {}", symbol),
             ParseError::GrammarDoesNotExist(rule) => write!(f, "Grammar rule {} does not exist", rule),
             ParseError::StateDoesNotExist(state) => write!(f, "state {} does not exist", state),
+            ParseError::IncorrectParseResult => write!(f, "AST evaluation final result is not a value"),
         }
     }
 }
